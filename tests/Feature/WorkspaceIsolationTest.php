@@ -144,6 +144,18 @@ class WorkspaceIsolationTest extends TestCase
         $this->assertStringContainsString($account->name, $contract->rendered_html);
     }
 
+    public function test_contract_generation_rejects_a_foreign_workspace_template(): void
+    {
+        [$user, $accountA, $portfolioA, $accountB, $portfolioB] = $this->twoWorkspaces();
+        $this->useAccount($user, $accountA);
+
+        $this->post(route('contracts.generate', $portfolioA['lease']), [
+            'template_id' => $portfolioB['template']->id,
+        ])->assertNotFound();
+
+        $this->assertSame(1, LeaseContract::count());
+    }
+
     public function test_filament_contract_creation_keeps_required_foreign_keys(): void
     {
         $user = User::factory()->create();

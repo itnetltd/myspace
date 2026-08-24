@@ -85,6 +85,11 @@ class Account extends Model
         return $this->hasMany(PropertyOwner::class);
     }
 
+    public function selfPropertyOwner(): BelongsTo
+    {
+        return $this->belongsTo(PropertyOwner::class, 'self_property_owner_id');
+    }
+
     public function managementAgreements(): HasMany
     {
         return $this->hasMany(ManagementAgreement::class);

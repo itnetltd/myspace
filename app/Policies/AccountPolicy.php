@@ -25,7 +25,7 @@ class AccountPolicy
 
     public function update(User $user, Account $account): bool
     {
-        return app(AccountAccess::class)->canAdminister($user, $account);
+        return app(AccountAccess::class)->can($user, $account, AccountAccess::MANAGE_ACCOUNT);
     }
 
     public function delete(User $user, Account $account): bool

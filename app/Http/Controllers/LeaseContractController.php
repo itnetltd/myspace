@@ -16,12 +16,14 @@ class LeaseContractController extends Controller
     public function generate(Request $request, Lease $lease)
     {
         Gate::authorize('view', $lease);
+        Gate::authorize('create', LeaseContract::class);
 
         $validated = $request->validate([
             'template_id' => ['required', 'integer'],
         ]);
         $templateId = (int) $validated['template_id'];
         $template = ContractTemplate::where('is_active', true)->findOrFail($templateId);
+        Gate::authorize('view', $template);
 
         $contract = DB::transaction(function () use ($lease, $template) {
             $rendered = app(ContractRenderService::class)->render($lease, $template);

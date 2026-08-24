@@ -10,7 +10,7 @@ class RentStatementController extends Controller
 {
     public function lease(Lease $lease)
     {
-        Gate::authorize('view', $lease);
+        Gate::authorize('viewStatement', $lease);
 
         $lease->loadMissing([
             'unit',

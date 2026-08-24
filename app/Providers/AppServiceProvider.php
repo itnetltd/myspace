@@ -19,9 +19,19 @@ use App\Models\Tenant;
 use App\Models\Unit;
 use App\Models\UnitAsset;
 use App\Observers\LeaseObserver;
-use App\Policies\AccountOwnedPolicy;
 use App\Policies\AccountPolicy;
+use App\Policies\AssetPolicy;
+use App\Policies\ContractPolicy;
+use App\Policies\InspectionPolicy;
+use App\Policies\LeasePolicy;
+use App\Policies\MaintenanceTicketPolicy;
 use App\Policies\ManagementAgreementPolicy;
+use App\Policies\PropertyOwnerPolicy;
+use App\Policies\PropertyPolicy;
+use App\Policies\RentInvoicePolicy;
+use App\Policies\RentPaymentPolicy;
+use App\Policies\TenantPolicy;
+use App\Policies\UnitPolicy;
 use App\Support\CurrentAccount;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -43,25 +53,20 @@ class AppServiceProvider extends ServiceProvider
     {
         // ✅ Auto-generate invoices when lease becomes Active (observer)
         Gate::policy(Account::class, AccountPolicy::class);
+        Gate::policy(AssetItem::class, AssetPolicy::class);
+        Gate::policy(ContractTemplate::class, ContractPolicy::class);
+        Gate::policy(Inspection::class, InspectionPolicy::class);
+        Gate::policy(Lease::class, LeasePolicy::class);
+        Gate::policy(LeaseContract::class, ContractPolicy::class);
+        Gate::policy(MaintenanceTicket::class, MaintenanceTicketPolicy::class);
         Gate::policy(ManagementAgreement::class, ManagementAgreementPolicy::class);
-
-        foreach ([
-            AssetItem::class,
-            ContractTemplate::class,
-            Inspection::class,
-            Lease::class,
-            LeaseContract::class,
-            MaintenanceTicket::class,
-            Property::class,
-            PropertyOwner::class,
-            RentInvoice::class,
-            RentPayment::class,
-            Tenant::class,
-            Unit::class,
-            UnitAsset::class,
-        ] as $model) {
-            Gate::policy($model, AccountOwnedPolicy::class);
-        }
+        Gate::policy(Property::class, PropertyPolicy::class);
+        Gate::policy(PropertyOwner::class, PropertyOwnerPolicy::class);
+        Gate::policy(RentInvoice::class, RentInvoicePolicy::class);
+        Gate::policy(RentPayment::class, RentPaymentPolicy::class);
+        Gate::policy(Tenant::class, TenantPolicy::class);
+        Gate::policy(Unit::class, UnitPolicy::class);
+        Gate::policy(UnitAsset::class, AssetPolicy::class);
 
         Lease::observe(LeaseObserver::class);
     }

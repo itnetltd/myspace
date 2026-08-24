@@ -5,19 +5,23 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\RentInvoiceResource\Pages;
 use App\Filament\Resources\RentInvoiceResource\RelationManagers\PaymentsRelationManager;
 use App\Models\RentInvoice;
+use App\Models\RentPayment;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Gate;
 
 class RentInvoiceResource extends Resource
 {
     protected static ?string $model = RentInvoice::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-receipt-percent';
+
     protected static ?string $navigationGroup = 'MySpaces Estate';
+
     protected static ?string $navigationLabel = 'Rent Invoices';
 
     public static function form(Form $form): Form
@@ -34,6 +38,7 @@ class RentInvoiceResource extends Resource
                             $record->loadMissing(['unit', 'tenant']);
                             $unit = $record->unit?->unit_code ?? 'Unit';
                             $tenant = $record->tenant?->full_name ?? 'Tenant';
+
                             return "{$unit} — {$tenant} (Lease #{$record->id})";
                         }),
 
@@ -182,6 +187,7 @@ class RentInvoiceResource extends Resource
                     ->label('Recalculate')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function (RentInvoice $record) {
+                        Gate::authorize('update', $record);
                         $record->refreshPaymentTotals();
                         Notification::make()->title('Invoice recalculated')->success()->send();
                     }),
@@ -192,6 +198,7 @@ class RentInvoiceResource extends Resource
                     ->url(fn (RentInvoice $record) => route('filament.admin.resources.rent-payments.create', [
                         'rent_invoice_id' => $record->id,
                     ]))
+                    ->visible(fn () => Gate::allows('create', RentPayment::class))
                     ->openUrlInNewTab(),
             ])
             ->bulkActions([

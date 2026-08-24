@@ -3,11 +3,16 @@
 namespace App\Policies;
 
 use App\Models\User;
+use App\Support\AccountAccess;
 use App\Support\CurrentAccount;
 use Illuminate\Database\Eloquent\Model;
 
 class ManagementAgreementPolicy extends AccountOwnedPolicy
 {
+    protected const VIEW_CAPABILITY = AccountAccess::VIEW_AGREEMENTS;
+
+    protected const MANAGE_CAPABILITY = AccountAccess::MANAGE_AGREEMENTS;
+
     public function viewAny(User $user): bool
     {
         return (bool) app(CurrentAccount::class)->forUser($user)?->isPropertyManagementCompany()

@@ -4,10 +4,9 @@ namespace App\Filament\Resources\AccountResource\Pages;
 
 use App\Filament\Resources\AccountResource;
 use App\Models\Account;
-use App\Support\CurrentAccount;
+use App\Services\AccountOnboarding;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CreateAccount extends CreateRecord
@@ -16,19 +15,9 @@ class CreateAccount extends CreateRecord
 
     protected function handleRecordCreation(array $data): Model
     {
-        return DB::transaction(function () use ($data) {
-            $data['slug'] = $data['slug'] ?: $this->uniqueSlug($data['name']);
-            $data['created_by'] = auth()->id();
+        $data['slug'] = $data['slug'] ?: $this->uniqueSlug($data['name']);
 
-            $account = Account::create($data);
-            $account->users()->attach(auth()->id(), [
-                'role' => Account::ROLE_OWNER,
-                'is_active' => true,
-            ]);
-            app(CurrentAccount::class)->switch(auth()->user(), $account->getKey());
-
-            return $account;
-        });
+        return app(AccountOnboarding::class)->create($data, auth()->user());
     }
 
     private function uniqueSlug(string $name): string

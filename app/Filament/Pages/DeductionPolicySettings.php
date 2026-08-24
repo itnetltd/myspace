@@ -27,9 +27,11 @@ class DeductionPolicySettings extends Page
 
     public static function canAccess(): bool
     {
+        $user = auth()->user();
         $account = app(CurrentAccount::class)->account();
 
-        return $account && app(AccountAccess::class)->canWrite(auth()->user(), $account);
+        return $user && $account
+            && app(AccountAccess::class)->can($user, $account, AccountAccess::MANAGE_SETTINGS);
     }
 
     public function mount(): void
@@ -69,6 +71,8 @@ class DeductionPolicySettings extends Page
 
     public function save(): void
     {
+        abort_unless(static::canAccess(), 403);
+
         $state = $this->form->getState();
 
         $missingRate = ((float) ($state['missing_rate_percent'] ?? 100)) / 100;

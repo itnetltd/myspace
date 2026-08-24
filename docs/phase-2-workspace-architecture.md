@@ -10,7 +10,9 @@ one account and a viewer in another.
 Spatie Laravel Permission remains the place for future platform-wide abilities
 (for example, platform support or system administration). Spatie teams are not
 enabled, so Spatie roles must not be used as workspace roles. Workspace access is
-currently decided by the active `account_user` membership and its role.
+currently decided by the active `account_user` membership and its role. Domain
+policies translate that role through the centralized `AccountAccess` capability
+matrix; models do not share one broad write permission.
 
 `CurrentAccount` resolves the active account from the authenticated user's active
 memberships and rejects account switching without such a membership. The
@@ -27,6 +29,28 @@ for safe rollback/reference; application relationships are now authoritative.
 nullable Property relationship allows a later portfolio-wide agreement without a
 schema break. Policies and navigation restrict this module to Accounts of type
 `property_management_company`.
+
+When an individual-landlord Account is created through onboarding, the same
+transaction creates its owner membership and one PropertyOwner profile. The
+Account's unique nullable `self_property_owner_id` marks that profile explicitly.
+Management-company Accounts leave this link null and create client owners normally.
+
+## Workspace role matrix
+
+- `owner`: full operational, financial, agreement, settings, account, and staff access.
+- `administrator`: the same current operational/configuration access, but Account
+  deletion remains prohibited.
+- `property_manager`: manages properties, owners, units, tenants, leases,
+  inspections, assets, maintenance, and contracts; finances are view-only and
+  account/settings/agreement administration is denied.
+- `accountant`: views core lease context and contracts; manages invoices and payments.
+- `maintenance`: views only the property/lease/asset context needed for maintenance
+  and manages maintenance tickets.
+- `viewer`: read-only access inside the active workspace.
+
+Management-agreement and policy-setting changes are limited to owners and
+administrators. A later business decision may grant either capability to property
+managers without changing the policy architecture.
 
 ## Account identifiers on domain tables
 

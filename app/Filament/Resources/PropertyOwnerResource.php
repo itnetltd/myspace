@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PropertyOwnerResource\Pages;
 use App\Models\PropertyOwner;
+use App\Support\CurrentAccount;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -17,6 +18,21 @@ class PropertyOwnerResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
 
     protected static ?string $navigationGroup = 'MySpaces Estate';
+
+    public static function getNavigationLabel(): string
+    {
+        return static::isIndividualAccount() ? 'Owner Profile' : 'Property Owners / Clients';
+    }
+
+    public static function getModelLabel(): string
+    {
+        return static::isIndividualAccount() ? 'owner profile' : 'property owner';
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return static::isIndividualAccount() ? 'owner profile' : 'property owners';
+    }
 
     public static function form(Form $form): Form
     {
@@ -70,5 +86,10 @@ class PropertyOwnerResource extends Resource
             'create' => Pages\CreatePropertyOwner::route('/create'),
             'edit' => Pages\EditPropertyOwner::route('/{record}/edit'),
         ];
+    }
+
+    private static function isIndividualAccount(): bool
+    {
+        return (bool) app(CurrentAccount::class)->account()?->isIndividualLandlord();
     }
 }

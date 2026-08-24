@@ -40,6 +40,7 @@ class PhaseTwoDemoSeeder extends Seeder
                 ['account_id' => $landlord->id, 'name' => 'Mugisha Jean'],
                 ['type' => PropertyOwner::TYPE_INDIVIDUAL, 'status' => PropertyOwner::STATUS_ACTIVE],
             );
+            $landlord->forceFill(['self_property_owner_id' => $landlordOwner->id])->saveQuietly();
             $landlordProperty = Property::withoutGlobalScopes()->updateOrCreate(
                 ['account_id' => $landlord->id, 'name' => 'Mugisha Residence'],
                 [

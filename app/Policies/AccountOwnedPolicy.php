@@ -7,32 +7,38 @@ use App\Support\AccountAccess;
 use App\Support\CurrentAccount;
 use Illuminate\Database\Eloquent\Model;
 
-class AccountOwnedPolicy
+abstract class AccountOwnedPolicy
 {
+    protected const VIEW_CAPABILITY = '';
+
+    protected const MANAGE_CAPABILITY = '';
+
     public function viewAny(User $user): bool
     {
         $account = app(CurrentAccount::class)->forUser($user);
 
-        return $account && app(AccountAccess::class)->canView($user, $account);
+        return $account
+            && app(AccountAccess::class)->can($user, $account, static::VIEW_CAPABILITY);
     }
 
     public function view(User $user, Model $record): bool
     {
         return $this->belongsToCurrentAccount($user, $record)
-            && app(AccountAccess::class)->canView($user, $record->account_id);
+            && app(AccountAccess::class)->can($user, $record->account_id, static::VIEW_CAPABILITY);
     }
 
     public function create(User $user): bool
     {
         $account = app(CurrentAccount::class)->forUser($user);
 
-        return $account && app(AccountAccess::class)->canWrite($user, $account);
+        return $account
+            && app(AccountAccess::class)->can($user, $account, static::MANAGE_CAPABILITY);
     }
 
     public function update(User $user, Model $record): bool
     {
         return $this->belongsToCurrentAccount($user, $record)
-            && app(AccountAccess::class)->canWrite($user, $record->account_id);
+            && app(AccountAccess::class)->can($user, $record->account_id, static::MANAGE_CAPABILITY);
     }
 
     public function delete(User $user, Model $record): bool
@@ -60,5 +66,11 @@ class AccountOwnedPolicy
         $account = app(CurrentAccount::class)->forUser($user);
 
         return $account && (int) $record->account_id === (int) $account->getKey();
+    }
+
+    protected function hasCapabilityForRecord(User $user, Model $record, string $capability): bool
+    {
+        return $this->belongsToCurrentAccount($user, $record)
+            && app(AccountAccess::class)->can($user, $record->account_id, $capability);
     }
 }

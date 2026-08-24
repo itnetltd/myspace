@@ -29,9 +29,11 @@ class RentPolicySettings extends Page
 
     public static function canAccess(): bool
     {
+        $user = auth()->user();
         $account = app(CurrentAccount::class)->account();
 
-        return $account && app(AccountAccess::class)->canWrite(auth()->user(), $account);
+        return $user && $account
+            && app(AccountAccess::class)->can($user, $account, AccountAccess::MANAGE_SETTINGS);
     }
 
     public function mount(): void
@@ -94,6 +96,8 @@ class RentPolicySettings extends Page
 
     public function save(): void
     {
+        abort_unless(static::canAccess(), 403);
+
         $s = $this->form->getState();
 
         Setting::set('rent.invoice_months_ahead', (string) (int) ($s['invoice_months_ahead'] ?? 6));

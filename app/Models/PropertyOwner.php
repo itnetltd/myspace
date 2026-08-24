@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class PropertyOwner extends Model
 {
@@ -55,5 +56,15 @@ class PropertyOwner extends Model
     public function managementAgreements(): HasMany
     {
         return $this->hasMany(ManagementAgreement::class);
+    }
+
+    public function selfOwnedAccount(): HasOne
+    {
+        return $this->hasOne(Account::class, 'self_property_owner_id');
+    }
+
+    public function isAccountSelfOwner(): bool
+    {
+        return $this->selfOwnedAccount()->exists();
     }
 }

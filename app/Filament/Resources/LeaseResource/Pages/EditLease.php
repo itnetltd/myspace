@@ -2,22 +2,22 @@
 
 namespace App\Filament\Resources\LeaseResource\Pages;
 
-use App\Models\ContractTemplate;
-use App\Models\LeaseContract;
-use App\Services\ContractRenderService;
-use Filament\Forms\Components\Select;
-
 use App\Filament\Resources\LeaseResource;
+use App\Models\ContractTemplate;
 use App\Models\Lease;
+use App\Models\LeaseContract;
 use App\Models\RentInvoice;
 use App\Models\Setting;
+use App\Services\ContractRenderService;
 use Carbon\Carbon;
 use Filament\Actions;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Support\Facades\Gate;
 
 class EditLease extends EditRecord
 {
@@ -40,12 +40,12 @@ class EditLease extends EditRecord
         $months = max(1, min($months, 36));
         $dueDay = max(1, min($dueDay, 28));
 
-        $baseStart = !empty($firstPeriodStart)
+        $baseStart = ! empty($firstPeriodStart)
             ? Carbon::parse($firstPeriodStart)->startOfDay()
             : Carbon::parse($lease->start_date)->startOfDay();
 
         // Never generate invoices before lease start month
-        if (!empty($lease->start_date)) {
+        if (! empty($lease->start_date)) {
             $leaseStartMonth = Carbon::parse($lease->start_date)->startOfMonth();
             if ($baseStart->startOfMonth()->lt($leaseStartMonth)) {
                 $baseStart = $leaseStartMonth->copy();
@@ -61,7 +61,7 @@ class EditLease extends EditRecord
 
         for ($i = 0; $i < $months; $i++) {
             $periodStart = $baseStart->copy()->addMonthsNoOverflow($i)->startOfMonth();
-            $periodEnd   = $periodStart->copy()->endOfMonth();
+            $periodEnd = $periodStart->copy()->endOfMonth();
 
             if ($leaseEndMonth && $periodStart->gt($leaseEndMonth)) {
                 break;
@@ -77,6 +77,7 @@ class EditLease extends EditRecord
 
             if ($exists) {
                 $skipped++;
+
                 continue;
             }
 
@@ -140,6 +141,7 @@ class EditLease extends EditRecord
                             ->body($result['message'])
                             ->warning()
                             ->send();
+
                         return;
                     }
 
@@ -232,6 +234,7 @@ class EditLease extends EditRecord
                 Actions\Action::make('generateInvoices')
                     ->label('Generate Invoices')
                     ->icon('heroicon-o-calendar-days')
+                    ->visible(fn () => Gate::allows('create', RentInvoice::class))
                     ->form([
                         TextInput::make('months')
                             ->label('How many months?')
@@ -255,6 +258,8 @@ class EditLease extends EditRecord
                             ->required(),
                     ])
                     ->action(function (array $data) {
+                        Gate::authorize('create', RentInvoice::class);
+
                         /** @var Lease $lease */
                         $lease = $this->record;
 
@@ -262,7 +267,7 @@ class EditLease extends EditRecord
                             $lease,
                             (int) ($data['months'] ?? 6),
                             (int) ($data['due_day'] ?? 5),
-                            !empty($data['first_period_start']) ? $data['first_period_start'] : null
+                            ! empty($data['first_period_start']) ? $data['first_period_start'] : null
                         );
 
                         if (! $result['ok']) {
@@ -271,6 +276,7 @@ class EditLease extends EditRecord
                                 ->body($result['message'])
                                 ->danger()
                                 ->send();
+
                             return;
                         }
 
@@ -285,70 +291,75 @@ class EditLease extends EditRecord
                 ->icon('heroicon-o-banknotes')
                 ->button(),
 
-// ✅ CONTRACTS dropdown (templates + languages)
-ActionGroup::make([
-    Actions\Action::make('generateContract')
-        ->label('Generate Contract')
-        ->icon('heroicon-o-document-text')
-        ->form([
-            Select::make('template_id')
-                ->label('Template')
-                ->options(fn () => ContractTemplate::where('is_active', true)
-                    ->orderBy('name')
-                    ->get()
-                    ->mapWithKeys(fn ($t) => [$t->id => "{$t->name} ({$t->language} v{$t->version})"])
-                    ->toArray()
-                )
-                ->searchable()
-                ->required(),
-        ])
-        ->action(function (array $data) {
-            /** @var Lease $lease */
-            $lease = $this->record;
+            // ✅ CONTRACTS dropdown (templates + languages)
+            ActionGroup::make([
+                Actions\Action::make('generateContract')
+                    ->label('Generate Contract')
+                    ->icon('heroicon-o-document-text')
+                    ->visible(fn () => Gate::allows('create', LeaseContract::class))
+                    ->form([
+                        Select::make('template_id')
+                            ->label('Template')
+                            ->options(fn () => ContractTemplate::where('is_active', true)
+                                ->orderBy('name')
+                                ->get()
+                                ->mapWithKeys(fn ($t) => [$t->id => "{$t->name} ({$t->language} v{$t->version})"])
+                                ->toArray()
+                            )
+                            ->searchable()
+                            ->required(),
+                    ])
+                    ->action(function (array $data) {
+                        Gate::authorize('create', LeaseContract::class);
 
-            $template = ContractTemplate::findOrFail((int) $data['template_id']);
+                        /** @var Lease $lease */
+                        $lease = $this->record;
 
-            $rendered = app(ContractRenderService::class)->render($lease, $template);
+                        $template = ContractTemplate::findOrFail((int) $data['template_id']);
+                        Gate::authorize('view', $template);
 
-            $contract = LeaseContract::create([
-                'lease_id' => $lease->id,
-                'contract_template_id' => $template->id,
-                'language' => $template->language,
-                'status' => 'draft',
-                'rendered_html' => $rendered,
-            ]);
+                        $rendered = app(ContractRenderService::class)->render($lease, $template);
 
-            Notification::make()
-                ->title('Contract generated')
-                ->body("Contract #{$contract->id} created from {$template->name} ({$template->language}).")
-                ->success()
-                ->send();
+                        $contract = LeaseContract::create([
+                            'lease_id' => $lease->id,
+                            'contract_template_id' => $template->id,
+                            'language' => $template->language,
+                            'status' => 'draft',
+                            'rendered_html' => $rendered,
+                        ]);
 
-            // Open the PDF download route in a new tab
-            $this->redirect(route('contracts.pdf', $contract));
-        }),
+                        Notification::make()
+                            ->title('Contract generated')
+                            ->body("Contract #{$contract->id} created from {$template->name} ({$template->language}).")
+                            ->success()
+                            ->send();
 
-    Actions\Action::make('viewContracts')
-        ->label('View Contracts')
-        ->icon('heroicon-o-folder-open')
-        ->url(fn () => route('filament.admin.resources.lease-contracts.index', [
-            'tableFilters[lease_id][value]' => $this->record->id,
-        ]))
-        ->openUrlInNewTab(),
+                        // Open the PDF download route in a new tab
+                        $this->redirect(route('contracts.pdf', $contract));
+                    }),
 
-    Actions\Action::make('downloadLatestContractPdf')
-        ->label('Latest Contract PDF')
-        ->icon('heroicon-o-arrow-down-tray')
-        ->visible(fn () => $this->record->contracts()->exists())
-        ->url(function () {
-            $latest = $this->record->contracts()->latest('id')->first();
-            return route('contracts.pdf', $latest);
-        })
-        ->openUrlInNewTab(),
-])
-    ->label('Contracts')
-    ->icon('heroicon-o-document-duplicate')
-    ->button(),
+                Actions\Action::make('viewContracts')
+                    ->label('View Contracts')
+                    ->icon('heroicon-o-folder-open')
+                    ->url(fn () => route('filament.admin.resources.lease-contracts.index', [
+                        'tableFilters[lease_id][value]' => $this->record->id,
+                    ]))
+                    ->openUrlInNewTab(),
+
+                Actions\Action::make('downloadLatestContractPdf')
+                    ->label('Latest Contract PDF')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->visible(fn () => $this->record->contracts()->exists())
+                    ->url(function () {
+                        $latest = $this->record->contracts()->latest('id')->first();
+
+                        return route('contracts.pdf', $latest);
+                    })
+                    ->openUrlInNewTab(),
+            ])
+                ->label('Contracts')
+                ->icon('heroicon-o-document-duplicate')
+                ->button(),
 
             // ✅ MAINTENANCE dropdown (fits on Windows)
             ActionGroup::make([
@@ -382,6 +393,7 @@ ActionGroup::make([
                             ->body('Create a Move-Out Inspection first.')
                             ->danger()
                             ->send();
+
                         return;
                     }
 

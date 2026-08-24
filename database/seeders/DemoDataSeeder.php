@@ -33,6 +33,7 @@ class DemoDataSeeder extends Seeder
             ['account_id' => $account->id, 'name' => 'Jean Paul N.'],
             ['type' => PropertyOwner::TYPE_INDIVIDUAL, 'phone' => '0788 000 111'],
         );
+        $account->forceFill(['self_property_owner_id' => $owner->id])->saveQuietly();
 
         /** -----------------------------
          * PROPERTY & UNIT

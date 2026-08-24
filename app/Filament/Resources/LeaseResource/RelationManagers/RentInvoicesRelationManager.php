@@ -3,14 +3,17 @@
 namespace App\Filament\Resources\LeaseResource\RelationManagers;
 
 use App\Models\RentInvoice;
+use App\Models\RentPayment;
 use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Gate;
 
 class RentInvoicesRelationManager extends RelationManager
 {
     protected static string $relationship = 'rentInvoices';
+
     protected static ?string $title = 'Rent Invoices';
 
     public function table(Table $table): Table
@@ -42,6 +45,7 @@ class RentInvoicesRelationManager extends RelationManager
                         $data['late_fee'] = $data['late_fee'] ?? 0;
                         $data['total_due'] = $data['total_due'] ?? (float) ($data['amount_due'] ?? 0);
                         $data['status'] = 'unpaid';
+
                         return $data;
                     }),
             ])
@@ -52,12 +56,14 @@ class RentInvoicesRelationManager extends RelationManager
                     ->url(fn (RentInvoice $record) => route('filament.admin.resources.rent-payments.create', [
                         'rent_invoice_id' => $record->id,
                     ]))
+                    ->visible(fn () => Gate::allows('create', RentPayment::class))
                     ->openUrlInNewTab(),
 
                 Tables\Actions\Action::make('recalc')
                     ->label('Recalc')
                     ->icon('heroicon-o-arrow-path')
                     ->action(function (RentInvoice $record) {
+                        Gate::authorize('update', $record);
                         $record->refreshPaymentTotals();
                     }),
 
