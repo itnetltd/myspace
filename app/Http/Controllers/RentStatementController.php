@@ -3,8 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Lease;
-use Illuminate\Http\Request;
-use PDF;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class RentStatementController extends Controller
 {
@@ -26,13 +25,13 @@ class RentStatementController extends Controller
 
         $totals = [
             'amount_due' => (float) $invoices->sum('amount_due'),
-            'late_fee'   => (float) $invoices->sum('late_fee'),
-            'total_due'  => (float) $invoices->sum('total_due'),
-            'paid'       => (float) $invoices->sum('amount_paid'),
-            'balance'    => (float) ($invoices->sum('total_due') - $invoices->sum('amount_paid')),
+            'late_fee' => (float) $invoices->sum('late_fee'),
+            'total_due' => (float) $invoices->sum('total_due'),
+            'paid' => (float) $invoices->sum('amount_paid'),
+            'balance' => (float) ($invoices->sum('total_due') - $invoices->sum('amount_paid')),
         ];
 
-        $pdf = PDF::loadView('pdf.rent-statement-lease', [
+        $pdf = Pdf::loadView('pdf.rent-statement-lease', [
             'lease' => $lease,
             'invoices' => $invoices,
             'totals' => $totals,

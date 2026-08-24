@@ -5,17 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-
-// ✅ Roles/Permissions
 use Spatie\Permission\Traits\HasRoles;
-
-// ✅ Add missing imports
-use App\Models\Account;
-use App\Models\Tenant;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, HasRoles, Notifiable;
 
     protected $fillable = [
         'name',
@@ -50,7 +44,7 @@ class User extends Authenticatable
     public function accounts()
     {
         return $this->belongsToMany(Account::class)
-            ->withPivot(['role'])
+            ->withPivot(['role', 'is_active'])
             ->withTimestamps();
     }
 
@@ -71,7 +65,7 @@ class User extends Authenticatable
      */
     public function getCurrentAccountId(bool $autoPersistFallback = true): ?int
     {
-        if (!empty($this->current_account_id)) {
+        if (! empty($this->current_account_id)) {
             return (int) $this->current_account_id;
         }
 
@@ -100,10 +94,12 @@ class User extends Authenticatable
         // Use loaded accounts first
         if ($this->relationLoaded('accounts')) {
             $acc = $this->accounts->firstWhere('id', $accountId);
+
             return $acc?->pivot?->role;
         }
 
         $account = $this->accounts()->where('accounts.id', $accountId)->first();
+
         return $account?->pivot?->role;
     }
 
@@ -113,34 +109,12 @@ class User extends Authenticatable
     public function hasAccountRole(array $roles): bool
     {
         $accountId = $this->getCurrentAccountId();
-        if (!$accountId) return false;
-
-        $role = $this->roleInAccount($accountId);
-        return $role ? in_array($role, $roles, true) : false;
-    }
-
-    // =========================
-    // Tenant Portal Link (Optional)
-    // =========================
-
-    /**
-     * If this user is a tenant portal user, link to Tenant record.
-     * Requires tenants.user_id (nullable) column.
-     */
-    public function tenantProfile()
-    {
-        return $this->hasOne(Tenant::class, 'user_id');
-    }
-
-    /**
-     * Quick check: is this login a tenant portal user?
-     */
-    public function isTenantUser(): bool
-    {
-        if ($this->relationLoaded('tenantProfile')) {
-            return (bool) $this->tenantProfile;
+        if (! $accountId) {
+            return false;
         }
 
-        return $this->tenantProfile()->exists();
+        $role = $this->roleInAccount($accountId);
+
+        return $role ? in_array($role, $roles, true) : false;
     }
 }

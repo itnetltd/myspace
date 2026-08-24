@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Lease;
 use App\Models\ContractTemplate;
+use App\Models\Lease;
 use App\Models\LeaseContract;
 use App\Services\ContractRenderService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
-use PDF;
 
 class LeaseContractController extends Controller
 {
@@ -32,9 +32,9 @@ class LeaseContractController extends Controller
 
     public function pdf(LeaseContract $contract)
     {
-        $contract->loadMissing(['lease.unit','lease.tenant','template']);
+        $contract->loadMissing(['lease.unit', 'lease.tenant', 'template']);
 
-        $pdf = PDF::loadView('pdf.lease-contract', [
+        $pdf = Pdf::loadView('pdf.lease-contract', [
             'contract' => $contract,
         ])->setPaper('a4', 'portrait');
 

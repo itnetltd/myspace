@@ -2,20 +2,20 @@
 
 namespace App\Services;
 
-use App\Models\Lease;
 use App\Models\ContractTemplate;
+use App\Models\Lease;
 
 class ContractRenderService
 {
     public function render(Lease $lease, ContractTemplate $template): string
     {
-        $lease->loadMissing(['unit','tenant']);
+        $lease->loadMissing(['unit', 'tenant']);
 
         $vars = [
             '{{tenant_full_name}}' => $lease->tenant?->full_name ?? '',
             '{{tenant_phone}}' => $lease->tenant?->phone ?? '',
             '{{tenant_email}}' => $lease->tenant?->email ?? '',
-            '{{tenant_national_id}}' => $lease->tenant?->national_id ?? '',
+            '{{tenant_national_id}}' => $lease->tenant?->id_number ?? '',
 
             '{{unit_code}}' => $lease->unit?->unit_code ?? '',
             '{{lease_start_date}}' => optional($lease->start_date)->format('Y-m-d') ?? '',
