@@ -2,23 +2,35 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Pages\Page;
-use Filament\Forms\Form;
+use App\Models\Setting;
+use App\Support\AccountAccess;
+use App\Support\CurrentAccount;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Form;
 use Filament\Notifications\Notification;
-use App\Models\Setting;
+use Filament\Pages\Page;
 
 class DeductionPolicySettings extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
+
     protected static ?string $navigationGroup = 'MySpaces Estate';
+
     protected static ?string $navigationLabel = 'Deduction Policy';
+
     protected static ?string $title = 'Deduction Policy Settings';
 
     protected static string $view = 'filament.pages.deduction-policy-settings';
 
     public ?array $data = [];
+
+    public static function canAccess(): bool
+    {
+        $account = app(CurrentAccount::class)->account();
+
+        return $account && app(AccountAccess::class)->canWrite(auth()->user(), $account);
+    }
 
     public function mount(): void
     {

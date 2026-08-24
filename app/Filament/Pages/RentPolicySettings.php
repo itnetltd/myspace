@@ -2,25 +2,37 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Pages\Page;
-use Filament\Forms\Form;
-use Filament\Forms\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Toggle;
-use Filament\Notifications\Notification;
 use App\Models\Setting;
+use App\Support\AccountAccess;
+use App\Support\CurrentAccount;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Form;
+use Filament\Notifications\Notification;
+use Filament\Pages\Page;
 
 class RentPolicySettings extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
+
     protected static ?string $navigationGroup = 'MySpaces Estate';
+
     protected static ?string $navigationLabel = 'Rent Policy';
+
     protected static ?string $title = 'Rent Policy Settings';
 
     protected static string $view = 'filament.pages.rent-policy-settings';
 
     public ?array $data = [];
+
+    public static function canAccess(): bool
+    {
+        $account = app(CurrentAccount::class)->account();
+
+        return $account && app(AccountAccess::class)->canWrite(auth()->user(), $account);
+    }
 
     public function mount(): void
     {
@@ -87,7 +99,7 @@ class RentPolicySettings extends Page
         Setting::set('rent.invoice_months_ahead', (string) (int) ($s['invoice_months_ahead'] ?? 6));
         Setting::set('rent.due_day', (string) (int) ($s['due_day'] ?? 5));
 
-        Setting::set('rent.late_fee_enabled', (string) ((int) !empty($s['late_fee_enabled'])));
+        Setting::set('rent.late_fee_enabled', (string) ((int) ! empty($s['late_fee_enabled'])));
         Setting::set('rent.late_fee_type', (string) ($s['late_fee_type'] ?? 'fixed'));
         Setting::set('rent.late_fee_value', (string) ($s['late_fee_value'] ?? 0));
         Setting::set('rent.late_fee_grace_days', (string) (int) ($s['late_fee_grace_days'] ?? 0));

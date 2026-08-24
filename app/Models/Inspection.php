@@ -2,16 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
-use App\Models\Concerns\BelongsToAccount;
 
 class Inspection extends Model
 {
     use BelongsToAccount;
+
     protected $fillable = [
+        'account_id',
         'unit_id',
         'lease_id',
         'type',
@@ -24,6 +26,14 @@ class Inspection extends Model
     protected $casts = [
         'inspected_on' => 'date',
     ];
+
+    protected function accountParentMap(): array
+    {
+        return [
+            'unit_id' => Unit::class,
+            'lease_id' => Lease::class,
+        ];
+    }
 
     public function unit(): BelongsTo
     {
@@ -80,13 +90,13 @@ class Inspection extends Model
                 $asset = $line->assetItem;
 
                 $assetName = $asset?->name ?? 'Unknown asset';
-                $expected  = (int) $line->expected_qty;
-                $found     = (int) $line->found_qty;
+                $expected = (int) $line->expected_qty;
+                $found = (int) $line->found_qty;
 
                 $missingQty = max(0, $expected - $found);
 
                 // Costs (0 if not provided)
-                $purchaseCost     = (float) ($asset?->purchase_cost ?? 0);
+                $purchaseCost = (float) ($asset?->purchase_cost ?? 0);
                 $replacementValue = (float) ($asset?->replacement_value ?? 0);
 
                 // Preferred unit value for deductions
@@ -109,37 +119,41 @@ class Inspection extends Model
 
                 // Manual override (nullable)
                 $override = $line->deduction_override;
-                $overrideUsed = !is_null($override);
+                $overrideUsed = ! is_null($override);
 
                 $appliedDeduction = $overrideUsed
                     ? (float) $override
                     : $suggestedDeduction;
 
                 $issueLabel = [];
-                if ($missingQty > 0) $issueLabel[] = "Missing ({$missingQty})";
-                if ($isDamaged) $issueLabel[] = "Damaged";
+                if ($missingQty > 0) {
+                    $issueLabel[] = "Missing ({$missingQty})";
+                }
+                if ($isDamaged) {
+                    $issueLabel[] = 'Damaged';
+                }
 
                 return [
-                    'asset'                 => $assetName,
-                    'expected_qty'          => $expected,
-                    'found_qty'             => $found,
-                    'missing_qty'           => $missingQty,
-                    'condition_status'      => $line->condition_status,
-                    'issue_type'            => $line->issue_type,
+                    'asset' => $assetName,
+                    'expected_qty' => $expected,
+                    'found_qty' => $found,
+                    'missing_qty' => $missingQty,
+                    'condition_status' => $line->condition_status,
+                    'issue_type' => $line->issue_type,
 
                     // Costs
-                    'purchase_cost'         => $purchaseCost,
-                    'replacement_value'     => $replacementValue,
-                    'unit_value_used'       => $unitValueUsed,
+                    'purchase_cost' => $purchaseCost,
+                    'replacement_value' => $replacementValue,
+                    'unit_value_used' => $unitValueUsed,
 
                     // Deductions
-                    'suggested_deduction'   => $suggestedDeduction,
-                    'applied_deduction'     => (float) $appliedDeduction,
-                    'override_used'         => $overrideUsed,
-                    'deduction_reason'      => $line->deduction_reason,
+                    'suggested_deduction' => $suggestedDeduction,
+                    'applied_deduction' => (float) $appliedDeduction,
+                    'override_used' => $overrideUsed,
+                    'deduction_reason' => $line->deduction_reason,
 
-                    'issue_label'           => implode(', ', $issueLabel) ?: '—',
-                    'remarks'               => $line->remarks,
+                    'issue_label' => implode(', ', $issueLabel) ?: '—',
+                    'remarks' => $line->remarks,
                 ];
             })
             ->filter(function ($row) {

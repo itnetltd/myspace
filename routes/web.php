@@ -13,7 +13,7 @@ Route::get('/', function () {
 // REPORTS (PDF)
 // =========================
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'current.account'])->group(function () {
     Route::get('/reports/move-out/{inspection}', [MoveOutReportController::class, 'show'])
         ->name('reports.moveout');
 

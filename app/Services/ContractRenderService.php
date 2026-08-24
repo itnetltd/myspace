@@ -9,9 +9,27 @@ class ContractRenderService
 {
     public function render(Lease $lease, ContractTemplate $template): string
     {
-        $lease->loadMissing(['unit', 'tenant']);
+        $lease->loadMissing(['unit.property.propertyOwner', 'unit.property.account', 'tenant']);
+
+        $property = $lease->unit?->property;
+        $owner = $property?->propertyOwner;
+        $account = $property?->account;
+        $managementCompany = $account?->isPropertyManagementCompany() ? $account : null;
 
         $vars = [
+            '{{owner_name}}' => $owner?->name ?? '',
+            '{{owner_phone}}' => $owner?->phone ?? '',
+            '{{owner_email}}' => $owner?->email ?? '',
+            '{{owner_tin}}' => $owner?->tin ?? '',
+
+            '{{management_company_name}}' => $managementCompany?->name ?? '',
+            '{{management_company_phone}}' => $managementCompany?->phone ?? '',
+            '{{management_company_email}}' => $managementCompany?->email ?? '',
+            '{{management_company_tin}}' => $managementCompany?->tin ?? '',
+
+            '{{property_name}}' => $property?->name ?? '',
+            '{{property_address}}' => $property?->address ?? '',
+
             '{{tenant_full_name}}' => $lease->tenant?->full_name ?? '',
             '{{tenant_phone}}' => $lease->tenant?->phone ?? '',
             '{{tenant_email}}' => $lease->tenant?->email ?? '',
@@ -23,11 +41,10 @@ class ContractRenderService
             '{{monthly_rent}}' => number_format((float) $lease->monthly_rent, 0),
             '{{deposit}}' => number_format((float) $lease->deposit, 0),
 
-            // Landlord fields (set in settings later, or hardcode for now)
-            '{{landlord_name}}' => \App\Models\Setting::get('company.landlord_name', 'Landlord'),
-            '{{landlord_phone}}' => \App\Models\Setting::get('company.landlord_phone', ''),
-            '{{landlord_email}}' => \App\Models\Setting::get('company.landlord_email', ''),
-            '{{property_address}}' => \App\Models\Setting::get('company.property_address', ''),
+            // Backward-compatible aliases for existing templates.
+            '{{landlord_name}}' => $owner?->name ?? '',
+            '{{landlord_phone}}' => $owner?->phone ?? '',
+            '{{landlord_email}}' => $owner?->email ?? '',
         ];
 
         $html = $template->body_html;

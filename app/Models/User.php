@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CurrentAccount;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -63,27 +64,11 @@ class User extends Authenticatable
      * Optional: if current_account_id is empty but user has accounts,
      * automatically saves the first one as current_account_id.
      */
-    public function getCurrentAccountId(bool $autoPersistFallback = true): ?int
+    public function getCurrentAccountId(): ?int
     {
-        if (! empty($this->current_account_id)) {
-            return (int) $this->current_account_id;
-        }
+        $account = app(CurrentAccount::class)->forUser($this);
 
-        // Prefer already-loaded accounts relation (avoids extra query)
-        $firstAccountId = null;
-
-        if ($this->relationLoaded('accounts')) {
-            $firstAccountId = $this->accounts->first()?->id;
-        } else {
-            $firstAccountId = $this->accounts()->select('accounts.id')->value('accounts.id');
-        }
-
-        if ($firstAccountId && $autoPersistFallback) {
-            // Persist once so the app always has a workspace selected
-            $this->forceFill(['current_account_id' => $firstAccountId])->saveQuietly();
-        }
-
-        return $firstAccountId ? (int) $firstAccountId : null;
+        return $account?->getKey();
     }
 
     /**
@@ -93,12 +78,18 @@ class User extends Authenticatable
     {
         // Use loaded accounts first
         if ($this->relationLoaded('accounts')) {
-            $acc = $this->accounts->firstWhere('id', $accountId);
+            $acc = $this->accounts->first(
+                fn (Account $account) => (int) $account->getKey() === $accountId
+                    && (bool) $account->pivot?->is_active,
+            );
 
             return $acc?->pivot?->role;
         }
 
-        $account = $this->accounts()->where('accounts.id', $accountId)->first();
+        $account = $this->accounts()
+            ->wherePivot('is_active', true)
+            ->where('accounts.id', $accountId)
+            ->first();
 
         return $account?->pivot?->role;
     }

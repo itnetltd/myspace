@@ -8,30 +8,40 @@ use App\Models\LeaseContract;
 use App\Services\ContractRenderService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class LeaseContractController extends Controller
 {
     public function generate(Request $request, Lease $lease)
     {
-        $templateId = (int) $request->get('template_id');
+        Gate::authorize('view', $lease);
+
+        $validated = $request->validate([
+            'template_id' => ['required', 'integer'],
+        ]);
+        $templateId = (int) $validated['template_id'];
         $template = ContractTemplate::where('is_active', true)->findOrFail($templateId);
 
-        $renderer = app(ContractRenderService::class);
-        $rendered = $renderer->render($lease, $template);
+        $contract = DB::transaction(function () use ($lease, $template) {
+            $rendered = app(ContractRenderService::class)->render($lease, $template);
 
-        $contract = LeaseContract::create([
-            'lease_id' => $lease->id,
-            'contract_template_id' => $template->id,
-            'language' => $template->language,
-            'status' => 'draft',
-            'rendered_html' => $rendered,
-        ]);
+            return LeaseContract::create([
+                'lease_id' => $lease->id,
+                'contract_template_id' => $template->id,
+                'language' => $template->language,
+                'status' => 'draft',
+                'rendered_html' => $rendered,
+            ]);
+        });
 
         return redirect()->route('contracts.pdf', $contract);
     }
 
     public function pdf(LeaseContract $contract)
     {
+        Gate::authorize('view', $contract);
+
         $contract->loadMissing(['lease.unit', 'lease.tenant', 'template']);
 
         $pdf = Pdf::loadView('pdf.lease-contract', [

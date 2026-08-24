@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Validation\ValidationException;
 
 class InspectionLine extends Model
 {
@@ -23,31 +24,47 @@ class InspectionLine extends Model
     ];
 
     protected $casts = [
-        'expected_qty'        => 'integer',
-        'found_qty'           => 'integer',
-        'deduction_override'  => 'decimal:2',
+        'expected_qty' => 'integer',
+        'found_qty' => 'integer',
+        'deduction_override' => 'decimal:2',
     ];
 
     /**
      * Optional: keep consistent allowed values (useful later in validation/UI).
      */
     public const CONDITION_EXCELLENT = 'Excellent';
-    public const CONDITION_GOOD      = 'Good';
-    public const CONDITION_FAIR      = 'Fair';
-    public const CONDITION_DAMAGED   = 'Damaged';
-    public const CONDITION_MISSING   = 'Missing';
 
-    public const ISSUE_NONE    = 'none';
+    public const CONDITION_GOOD = 'Good';
+
+    public const CONDITION_FAIR = 'Fair';
+
+    public const CONDITION_DAMAGED = 'Damaged';
+
+    public const CONDITION_MISSING = 'Missing';
+
+    public const ISSUE_NONE = 'none';
+
     public const ISSUE_DAMAGED = 'damaged';
+
     public const ISSUE_MISSING = 'missing';
-    public const ISSUE_OTHER   = 'other';
+
+    public const ISSUE_OTHER = 'other';
 
     protected static function booted(): void
     {
         static::saving(function (self $line) {
+            $inspection = Inspection::withoutGlobalScopes()->find($line->inspection_id);
+            $asset = AssetItem::withoutGlobalScopes()->find($line->asset_item_id);
+
+            if (! $inspection || ! $asset || (int) $inspection->account_id !== (int) $asset->account_id) {
+                throw ValidationException::withMessages([
+                    'asset_item_id' => 'The selected asset belongs to another account.',
+                ]);
+            }
+
             // Normalize nulls to 0 to avoid comparison issues
             $expected = (int) ($line->expected_qty ?? 0);
-            $found    = (int) ($line->found_qty ?? 0);
+            $found = (int) ($line->found_qty ?? 0);
 
             // If an override is set, ensure it is non-negative (defensive)
             if (! is_null($line->deduction_override)) {
@@ -100,7 +117,7 @@ class InspectionLine extends Model
     public function missingQty(): int
     {
         $expected = (int) ($this->expected_qty ?? 0);
-        $found    = (int) ($this->found_qty ?? 0);
+        $found = (int) ($this->found_qty ?? 0);
 
         return max(0, $expected - $found);
     }

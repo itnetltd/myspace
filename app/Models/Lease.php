@@ -2,11 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Schema;
-use App\Models\Concerns\BelongsToAccount;
 
 class Lease extends Model
 {
@@ -16,10 +15,13 @@ class Lease extends Model
      * Status constants
      * ------------------- */
     public const STATUS_DRAFT = 'draft';
+
     public const STATUS_ACTIVE = 'active';
+
     public const STATUS_ENDED = 'ended';
 
     protected $fillable = [
+        'account_id',
         'unit_id',
         'tenant_id',
         'start_date',
@@ -37,25 +39,12 @@ class Lease extends Model
         'deposit' => 'decimal:2',
     ];
 
-    /**
-     * IMPORTANT SAFETY:
-     * If your SQLite table doesn't have account_id yet, strip it to avoid insert/update errors.
-     */
-    protected static function booted(): void
+    protected function accountParentMap(): array
     {
-        static::creating(function (self $lease) {
-            if (! Schema::hasColumn($lease->getTable(), 'account_id')) {
-                unset($lease->account_id);
-                unset($lease->attributes['account_id']);
-            }
-        });
-
-        static::updating(function (self $lease) {
-            if (! Schema::hasColumn($lease->getTable(), 'account_id')) {
-                unset($lease->account_id);
-                unset($lease->attributes['account_id']);
-            }
-        });
+        return [
+            'unit_id' => Unit::class,
+            'tenant_id' => Tenant::class,
+        ];
     }
 
     /** --------------------
@@ -100,7 +89,6 @@ class Lease extends Model
     /** --------------------
      * Relationships
      * ------------------- */
-
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
@@ -147,7 +135,6 @@ class Lease extends Model
     /** --------------------
      * Inspection helpers
      * ------------------- */
-
     public function moveInInspection()
     {
         return $this->inspections()
@@ -172,7 +159,6 @@ class Lease extends Model
     /** --------------------
      * Status helpers
      * ------------------- */
-
     public function isDraft(): bool
     {
         return $this->status === self::STATUS_DRAFT;
@@ -191,7 +177,6 @@ class Lease extends Model
     /** --------------------
      * Rent helpers (UPDATED for late fees)
      * ------------------- */
-
     public function totalRentDue(): float
     {
         $hasTotalDue = \Schema::hasColumn('rent_invoices', 'total_due');

@@ -2,27 +2,25 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
 // (These imports are optional; leaving them is fine)
-use App\Models\Property;
-use App\Models\Lease;
-use App\Models\UnitAsset;
-use App\Models\Inspection;
-use App\Models\Concerns\BelongsToAccount;
-
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Unit extends Model
 {
-use BelongsToAccount;    
-// Status constants (prevents inconsistent strings everywhere)
-    public const STATUS_VACANT   = 'vacant';
+    use BelongsToAccount;
+
+    // Status constants (prevents inconsistent strings everywhere)
+    public const STATUS_VACANT = 'vacant';
+
     public const STATUS_OCCUPIED = 'occupied';
-    public const STATUS_BLOCKED  = 'blocked'; // optional (e.g., under renovation)
+
+    public const STATUS_BLOCKED = 'blocked'; // optional (e.g., under renovation)
 
     protected $fillable = [
+        'account_id',
         'property_id',
         'unit_code',
         'bedrooms',
@@ -34,10 +32,15 @@ use BelongsToAccount;
 
     // Helpful casting (so calculations & sorting behave correctly)
     protected $casts = [
-        'bedrooms'     => 'integer',
-        'bathrooms'    => 'integer',
+        'bedrooms' => 'integer',
+        'bathrooms' => 'integer',
         'monthly_rent' => 'decimal:2',
     ];
+
+    protected function accountParentMap(): array
+    {
+        return ['property_id' => Property::class];
+    }
 
     /*
     |--------------------------------------------------------------------------
@@ -122,10 +125,10 @@ use BelongsToAccount;
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) {
-            self::STATUS_VACANT   => 'Vacant',
+            self::STATUS_VACANT => 'Vacant',
             self::STATUS_OCCUPIED => 'Occupied',
-            self::STATUS_BLOCKED  => 'Blocked',
-            default               => ucfirst((string) $this->status),
+            self::STATUS_BLOCKED => 'Blocked',
+            default => ucfirst((string) $this->status),
         };
     }
 

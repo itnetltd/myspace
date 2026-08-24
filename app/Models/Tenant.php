@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use App\Models\Concerns\BelongsToAccount;
 
 class Tenant extends Model
 {
     use BelongsToAccount;
+
     protected $fillable = [
+        'account_id',
         'full_name',
         'phone',
         'email',

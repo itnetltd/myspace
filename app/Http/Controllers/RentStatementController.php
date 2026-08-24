@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Lease;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Gate;
 
 class RentStatementController extends Controller
 {
     public function lease(Lease $lease)
     {
+        Gate::authorize('view', $lease);
+
         $lease->loadMissing([
             'unit',
             'tenant',

@@ -2,12 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
 
 class ContractTemplate extends Model
 {
+    use BelongsToAccount;
+
     protected $fillable = [
-        'name','language','version','is_active','body_html','required_fields'
+        'account_id', 'name', 'language', 'version', 'is_active', 'body_html', 'required_fields',
     ];
 
     protected $casts = [

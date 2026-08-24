@@ -2,8 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
+use App\Models\Account;
 use App\Models\ContractTemplate;
+use Illuminate\Database\Seeder;
 
 class ContractTemplateSeeder extends Seeder
 {
@@ -115,10 +116,10 @@ class ContractTemplateSeeder extends Seeder
 </p>
 HTML;
 
-        ContractTemplate::updateOrCreate(
-            ['name' => 'Standard Residential Lease', 'language' => 'en', 'version' => '1.0'],
-            ['is_active' => true, 'body_html' => $enHtml]
-        );
+        Account::query()->each(fn (Account $account) => ContractTemplate::withoutGlobalScopes()->updateOrCreate(
+            ['account_id' => $account->id, 'name' => 'Standard Residential Lease', 'language' => 'en', 'version' => '1.0'],
+            ['is_active' => true, 'body_html' => $enHtml],
+        ));
 
         // FR
         $frHtml = <<<'HTML'
@@ -227,10 +228,10 @@ HTML;
 </p>
 HTML;
 
-        ContractTemplate::updateOrCreate(
-            ['name' => 'Bail d’Habitation Standard', 'language' => 'fr', 'version' => '1.0'],
-            ['is_active' => true, 'body_html' => $frHtml]
-        );
+        Account::query()->each(fn (Account $account) => ContractTemplate::withoutGlobalScopes()->updateOrCreate(
+            ['account_id' => $account->id, 'name' => 'Bail d’Habitation Standard', 'language' => 'fr', 'version' => '1.0'],
+            ['is_active' => true, 'body_html' => $frHtml],
+        ));
 
         // RW
         $rwHtml = <<<'HTML'
@@ -339,9 +340,9 @@ HTML;
 </p>
 HTML;
 
-        ContractTemplate::updateOrCreate(
-            ['name' => 'Amasezerano y’Ubukode (Standard)', 'language' => 'rw', 'version' => '1.0'],
-            ['is_active' => true, 'body_html' => $rwHtml]
-        );
+        Account::query()->each(fn (Account $account) => ContractTemplate::withoutGlobalScopes()->updateOrCreate(
+            ['account_id' => $account->id, 'name' => 'Amasezerano y’Ubukode (Standard)', 'language' => 'rw', 'version' => '1.0'],
+            ['is_active' => true, 'body_html' => $rwHtml],
+        ));
     }
 }

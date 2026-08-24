@@ -2,15 +2,17 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
+use App\Models\Account;
 use App\Models\Setting;
+use Illuminate\Database\Seeder;
 
 class DeductionPolicySeeder extends Seeder
 {
     public function run(): void
     {
-        // Store as decimals (0.00 - 1.00)
-        Setting::set('deduction.missing_rate', '1.00'); // 100%
-        Setting::set('deduction.damaged_rate', '0.30'); // 30%
+        Account::query()->each(function (Account $account) {
+            Setting::set('deduction.missing_rate', '1.00', $account);
+            Setting::set('deduction.damaged_rate', '0.30', $account);
+        });
     }
 }

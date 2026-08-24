@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Account;
 use App\Models\User;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
 class CreateDefaultAccountSeeder extends Seeder
@@ -23,7 +23,7 @@ class CreateDefaultAccountSeeder extends Seeder
             ['slug' => $slug],
             [
                 'name' => $name,
-                'type' => 'landlord',
+                'type' => Account::TYPE_INDIVIDUAL_LANDLORD,
                 'status' => 'active',
                 'created_by' => $user->id,
             ]

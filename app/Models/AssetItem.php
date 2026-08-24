@@ -2,12 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssetItem extends Model
 {
+    use BelongsToAccount;
+
     protected $fillable = [
+        'account_id',
         'name',
         'category',
         'brand',

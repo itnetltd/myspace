@@ -2,14 +2,16 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class LeaseContract extends Model
 {
-    use HasFactory;
+    use BelongsToAccount, HasFactory;
 
     protected $fillable = [
+        'account_id',
         'lease_id',
         'contract_template_id',
         'language',
@@ -27,6 +29,14 @@ class LeaseContract extends Model
         'language' => 'string',
         'rendered_html' => 'string',
     ];
+
+    protected function accountParentMap(): array
+    {
+        return [
+            'lease_id' => Lease::class,
+            'contract_template_id' => ContractTemplate::class,
+        ];
+    }
 
     public function lease()
     {

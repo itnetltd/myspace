@@ -2,25 +2,33 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use App\Models\Concerns\BelongsToAccount;
 
 class MaintenanceTicket extends Model
 {
     use BelongsToAccount;
+
     // Optional: standard statuses & priorities (helps consistency in UI)
     public const STATUS_OPEN = 'open';
+
     public const STATUS_IN_PROGRESS = 'in_progress';
+
     public const STATUS_RESOLVED = 'resolved';
+
     public const STATUS_CLOSED = 'closed';
 
     public const PRIORITY_LOW = 'low';
+
     public const PRIORITY_MEDIUM = 'medium';
+
     public const PRIORITY_HIGH = 'high';
+
     public const PRIORITY_URGENT = 'urgent';
 
     protected $fillable = [
+        'account_id',
         'unit_id',
         'lease_id',
         'ticket_no',
@@ -44,6 +52,14 @@ class MaintenanceTicket extends Model
         'estimated_cost' => 'decimal:2',
         'actual_cost' => 'decimal:2',
     ];
+
+    protected function accountParentMap(): array
+    {
+        return [
+            'unit_id' => Unit::class,
+            'lease_id' => Lease::class,
+        ];
+    }
 
     public function unit(): BelongsTo
     {
@@ -93,7 +109,7 @@ class MaintenanceTicket extends Model
                     $nextNumber = $lastSeq + 1;
                 }
 
-                $ticket->ticket_no = 'MT-' . $year . '-' . str_pad((string) $nextNumber, 6, '0', STR_PAD_LEFT);
+                $ticket->ticket_no = 'MT-'.$year.'-'.str_pad((string) $nextNumber, 6, '0', STR_PAD_LEFT);
             }
 
             // Default status/priority if not set (doesn't override your form)

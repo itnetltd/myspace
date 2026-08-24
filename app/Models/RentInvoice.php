@@ -2,23 +2,24 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToAccount;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Carbon\Carbon;
-use App\Models\Concerns\BelongsToAccount;
-use App\Models\Setting; // adjust if your Setting model is in a different namespace
+
+// adjust if your Setting model is in a different namespace
 
 class RentInvoice extends Model
 {
     use BelongsToAccount;
 
     protected $fillable = [
-        'lease_id','period_start','period_end','due_date',
-        'amount_due','amount_paid',
-        'late_fee','total_due',
-        'status','notes',
+        'account_id',
+        'lease_id', 'period_start', 'period_end', 'due_date',
+        'amount_due', 'amount_paid',
+        'late_fee', 'total_due',
+        'status', 'notes',
     ];
 
     /**
@@ -34,20 +35,9 @@ class RentInvoice extends Model
         'total_due' => 'decimal:2',
     ];
 
-    /**
-     * IMPORTANT FIX:
-     * If DB table doesn't have account_id (SQLite dev), remove it before insert/update.
-     */
-    protected static function booted(): void
+    protected function accountParentMap(): array
     {
-        $stripAccountIdIfMissingColumn = function (self $invoice) {
-            if (! Schema::hasColumn($invoice->getTable(), 'account_id')) {
-                unset($invoice->attributes['account_id']);
-            }
-        };
-
-        static::creating($stripAccountIdIfMissingColumn);
-        static::updating($stripAccountIdIfMissingColumn);
+        return ['lease_id' => Lease::class];
     }
 
     /**

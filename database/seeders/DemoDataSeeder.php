@@ -2,26 +2,44 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use Carbon\Carbon;
-
-use App\Models\Property;
-use App\Models\Unit;
-use App\Models\Tenant;
-use App\Models\Lease;
+use App\Models\Account;
 use App\Models\AssetItem;
-use App\Models\UnitAsset;
 use App\Models\Inspection;
 use App\Models\InspectionLine;
+use App\Models\Lease;
+use App\Models\Property;
+use App\Models\PropertyOwner;
+use App\Models\Tenant;
+use App\Models\Unit;
+use App\Models\UnitAsset;
+use Carbon\Carbon;
+use Illuminate\Database\Seeder;
 
 class DemoDataSeeder extends Seeder
 {
     public function run(): void
     {
+        $account = Account::query()->firstOrCreate(
+            ['slug' => 'legacy-demo-account'],
+            [
+                'name' => 'Legacy Demo Account',
+                'type' => Account::TYPE_INDIVIDUAL_LANDLORD,
+                'status' => Account::STATUS_ACTIVE,
+                'currency' => 'RWF',
+                'timezone' => 'Africa/Kigali',
+            ],
+        );
+        $owner = PropertyOwner::withoutGlobalScopes()->firstOrCreate(
+            ['account_id' => $account->id, 'name' => 'Jean Paul N.'],
+            ['type' => PropertyOwner::TYPE_INDIVIDUAL, 'phone' => '0788 000 111'],
+        );
+
         /** -----------------------------
          * PROPERTY & UNIT
          * ----------------------------- */
         $property = Property::create([
+            'account_id' => $account->id,
+            'property_owner_id' => $owner->id,
             'name' => 'MySpaces Apartments – Kicukiro',
             'type' => 'apartment',
             'address' => 'KK 15 Ave, Kicukiro',
@@ -30,6 +48,7 @@ class DemoDataSeeder extends Seeder
         ]);
 
         $unit = Unit::create([
+            'account_id' => $account->id,
             'property_id' => $property->id,
             'unit_code' => 'A-101',
             'bedrooms' => 2,
@@ -42,6 +61,7 @@ class DemoDataSeeder extends Seeder
          * ASSET CATALOG
          * ----------------------------- */
         $bed = AssetItem::create([
+            'account_id' => $account->id,
             'name' => 'Bed',
             'category' => 'Furniture',
             'purchase_cost' => 150000,
@@ -49,6 +69,7 @@ class DemoDataSeeder extends Seeder
         ]);
 
         $mattress = AssetItem::create([
+            'account_id' => $account->id,
             'name' => 'Mattress',
             'category' => 'Furniture',
             'purchase_cost' => 120000,
@@ -56,6 +77,7 @@ class DemoDataSeeder extends Seeder
         ]);
 
         $tv = AssetItem::create([
+            'account_id' => $account->id,
             'name' => 'Television',
             'category' => 'Electronics',
             'purchase_cost' => 350000,
@@ -63,6 +85,7 @@ class DemoDataSeeder extends Seeder
         ]);
 
         $fridge = AssetItem::create([
+            'account_id' => $account->id,
             'name' => 'Fridge',
             'category' => 'Appliance',
             'purchase_cost' => 450000,
@@ -74,24 +97,28 @@ class DemoDataSeeder extends Seeder
          * ----------------------------- */
         UnitAsset::insert([
             [
+                'account_id' => $account->id,
                 'unit_id' => $unit->id,
                 'asset_item_id' => $bed->id,
                 'quantity' => 2,
                 'condition_status' => 'Good',
             ],
             [
+                'account_id' => $account->id,
                 'unit_id' => $unit->id,
                 'asset_item_id' => $mattress->id,
                 'quantity' => 2,
                 'condition_status' => 'Good',
             ],
             [
+                'account_id' => $account->id,
                 'unit_id' => $unit->id,
                 'asset_item_id' => $tv->id,
                 'quantity' => 1,
                 'condition_status' => 'Good',
             ],
             [
+                'account_id' => $account->id,
                 'unit_id' => $unit->id,
                 'asset_item_id' => $fridge->id,
                 'quantity' => 1,
@@ -103,6 +130,7 @@ class DemoDataSeeder extends Seeder
          * TENANT & LEASE
          * ----------------------------- */
         $tenant = Tenant::create([
+            'account_id' => $account->id,
             'full_name' => 'Eric Mugabo',
             'phone' => '0722 123 456',
             'email' => 'eric@test.com',
@@ -112,6 +140,7 @@ class DemoDataSeeder extends Seeder
         ]);
 
         $lease = Lease::create([
+            'account_id' => $account->id,
             'tenant_id' => $tenant->id,
             'unit_id' => $unit->id,
             'start_date' => Carbon::now()->subYear(),
@@ -125,6 +154,7 @@ class DemoDataSeeder extends Seeder
          * MOVE-IN INSPECTION
          * ----------------------------- */
         $moveIn = Inspection::create([
+            'account_id' => $account->id,
             'unit_id' => $unit->id,
             'lease_id' => $lease->id,
             'type' => 'move_in',
@@ -148,6 +178,7 @@ class DemoDataSeeder extends Seeder
          * MOVE-OUT INSPECTION
          * ----------------------------- */
         $moveOut = Inspection::create([
+            'account_id' => $account->id,
             'unit_id' => $unit->id,
             'lease_id' => $lease->id,
             'type' => 'move_out',
