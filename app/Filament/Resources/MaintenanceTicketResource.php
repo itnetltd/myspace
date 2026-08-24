@@ -4,18 +4,22 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\MaintenanceTicketResource\Pages;
 use App\Models\MaintenanceTicket;
+use App\Models\PropertyExpense;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Gate;
 
 class MaintenanceTicketResource extends Resource
 {
     protected static ?string $model = MaintenanceTicket::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-wrench-screwdriver';
+
     protected static ?string $navigationGroup = 'MySpaces Estate';
+
     protected static ?string $navigationLabel = 'Maintenance Tickets';
 
     public static function form(Form $form): Form
@@ -48,6 +52,7 @@ class MaintenanceTicketResource extends Resource
                             $record->loadMissing(['unit', 'tenant']);
                             $unit = $record->unit?->unit_code ?? 'Unit';
                             $tenant = $record->tenant?->full_name ?? 'Tenant';
+
                             return "{$unit} — {$tenant} (Lease #{$record->id})";
                         }),
 
@@ -179,6 +184,20 @@ class MaintenanceTicketResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('createExpense')
+                    ->label('Create Expense')
+                    ->icon('heroicon-o-receipt-refund')
+                    ->visible(fn (MaintenanceTicket $record) => in_array($record->status, [
+                        MaintenanceTicket::STATUS_RESOLVED,
+                        MaintenanceTicket::STATUS_CLOSED,
+                    ], true)
+                        && $record->actual_cost !== null
+                        && ! $record->propertyExpense()->exists()
+                        && Gate::allows('create', PropertyExpense::class))
+                    ->url(fn (MaintenanceTicket $record) => route(
+                        'filament.admin.resources.property-expenses.create',
+                        ['maintenance_ticket_id' => $record->id],
+                    )),
             ])
             ->bulkActions([
                 Tables\Actions\DeleteBulkAction::make(),

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\LeaseContractController;
 use App\Http\Controllers\MoveOutReportController;
+use App\Http\Controllers\OwnerStatementController;
 use App\Http\Controllers\RentStatementController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,4 +26,6 @@ Route::middleware(['auth', 'current.account'])->group(function () {
 
     Route::get('/contracts/pdf/{contract}', [LeaseContractController::class, 'pdf'])
         ->name('contracts.pdf');
+    Route::get('/reports/owner-statement/{statement}', [OwnerStatementController::class, 'show'])
+        ->name('reports.owner-statement');
 });

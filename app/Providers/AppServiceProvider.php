@@ -11,7 +11,11 @@ use App\Models\Lease;
 use App\Models\LeaseContract;
 use App\Models\MaintenanceTicket;
 use App\Models\ManagementAgreement;
+use App\Models\OwnerDisbursement;
+use App\Models\OwnerLedgerEntry;
+use App\Models\OwnerStatement;
 use App\Models\Property;
+use App\Models\PropertyExpense;
 use App\Models\PropertyOwner;
 use App\Models\RentInvoice;
 use App\Models\RentPayment;
@@ -19,6 +23,8 @@ use App\Models\Tenant;
 use App\Models\Unit;
 use App\Models\UnitAsset;
 use App\Observers\LeaseObserver;
+use App\Observers\OwnerDisbursementObserver;
+use App\Observers\PropertyExpenseObserver;
 use App\Policies\AccountPolicy;
 use App\Policies\AssetPolicy;
 use App\Policies\ContractPolicy;
@@ -26,6 +32,10 @@ use App\Policies\InspectionPolicy;
 use App\Policies\LeasePolicy;
 use App\Policies\MaintenanceTicketPolicy;
 use App\Policies\ManagementAgreementPolicy;
+use App\Policies\OwnerDisbursementPolicy;
+use App\Policies\OwnerLedgerEntryPolicy;
+use App\Policies\OwnerStatementPolicy;
+use App\Policies\PropertyExpensePolicy;
 use App\Policies\PropertyOwnerPolicy;
 use App\Policies\PropertyPolicy;
 use App\Policies\RentInvoicePolicy;
@@ -60,7 +70,11 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(LeaseContract::class, ContractPolicy::class);
         Gate::policy(MaintenanceTicket::class, MaintenanceTicketPolicy::class);
         Gate::policy(ManagementAgreement::class, ManagementAgreementPolicy::class);
+        Gate::policy(OwnerDisbursement::class, OwnerDisbursementPolicy::class);
+        Gate::policy(OwnerLedgerEntry::class, OwnerLedgerEntryPolicy::class);
+        Gate::policy(OwnerStatement::class, OwnerStatementPolicy::class);
         Gate::policy(Property::class, PropertyPolicy::class);
+        Gate::policy(PropertyExpense::class, PropertyExpensePolicy::class);
         Gate::policy(PropertyOwner::class, PropertyOwnerPolicy::class);
         Gate::policy(RentInvoice::class, RentInvoicePolicy::class);
         Gate::policy(RentPayment::class, RentPaymentPolicy::class);
@@ -69,5 +83,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(UnitAsset::class, AssetPolicy::class);
 
         Lease::observe(LeaseObserver::class);
+        OwnerDisbursement::observe(OwnerDisbursementObserver::class);
+        PropertyExpense::observe(PropertyExpenseObserver::class);
     }
 }

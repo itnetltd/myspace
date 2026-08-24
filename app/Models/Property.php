@@ -34,4 +34,14 @@ class Property extends Model
     {
         return $this->hasMany(ManagementAgreement::class);
     }
+
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(PropertyExpense::class);
+    }
+
+    public function ownerLedgerEntries(): HasMany
+    {
+        return $this->hasMany(OwnerLedgerEntry::class);
+    }
 }

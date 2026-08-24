@@ -67,11 +67,35 @@ class AccountAccess
 
     public const MANAGE_SETTINGS = 'settings.manage';
 
+    public const VIEW_EXPENSES = 'expenses.view';
+
+    public const MANAGE_EXPENSES = 'expenses.manage';
+
+    public const POST_EXPENSES = 'expenses.post';
+
+    public const INITIATE_MAINTENANCE_EXPENSE = 'expenses.initiate-maintenance';
+
+    public const VIEW_OWNER_LEDGER = 'owner-ledger.view';
+
+    public const ADJUST_OWNER_LEDGER = 'owner-ledger.adjust';
+
+    public const VIEW_OWNER_STATEMENTS = 'owner-statements.view';
+
+    public const MANAGE_OWNER_STATEMENTS = 'owner-statements.manage';
+
+    public const FINALIZE_OWNER_STATEMENTS = 'owner-statements.finalize';
+
+    public const VIEW_OWNER_DISBURSEMENTS = 'owner-disbursements.view';
+
+    public const MANAGE_OWNER_DISBURSEMENTS = 'owner-disbursements.manage';
+
     private const VIEW_CAPABILITIES = [
         self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_OWNERS, self::VIEW_UNITS,
         self::VIEW_TENANTS, self::VIEW_LEASES, self::VIEW_INVOICES, self::VIEW_PAYMENTS,
         self::VIEW_FINANCIAL_STATEMENTS, self::VIEW_MAINTENANCE, self::VIEW_INSPECTIONS, self::VIEW_ASSETS,
         self::VIEW_CONTRACTS, self::VIEW_AGREEMENTS, self::VIEW_SETTINGS,
+        self::VIEW_EXPENSES, self::VIEW_OWNER_LEDGER, self::VIEW_OWNER_STATEMENTS,
+        self::VIEW_OWNER_DISBURSEMENTS,
     ];
 
     private const ROLE_CAPABILITIES = [
@@ -82,6 +106,9 @@ class AccountAccess
             self::MANAGE_LEASES, self::MANAGE_INVOICES, self::MANAGE_PAYMENTS,
             self::MANAGE_MAINTENANCE, self::MANAGE_INSPECTIONS, self::MANAGE_ASSETS,
             self::MANAGE_CONTRACTS, self::MANAGE_AGREEMENTS, self::MANAGE_SETTINGS,
+            self::MANAGE_EXPENSES, self::POST_EXPENSES, self::ADJUST_OWNER_LEDGER,
+            self::MANAGE_OWNER_STATEMENTS, self::FINALIZE_OWNER_STATEMENTS,
+            self::MANAGE_OWNER_DISBURSEMENTS,
         ],
         Account::ROLE_ADMINISTRATOR => [
             ...self::VIEW_CAPABILITIES,
@@ -90,26 +117,37 @@ class AccountAccess
             self::MANAGE_LEASES, self::MANAGE_INVOICES, self::MANAGE_PAYMENTS,
             self::MANAGE_MAINTENANCE, self::MANAGE_INSPECTIONS, self::MANAGE_ASSETS,
             self::MANAGE_CONTRACTS, self::MANAGE_AGREEMENTS, self::MANAGE_SETTINGS,
+            self::MANAGE_EXPENSES, self::POST_EXPENSES, self::ADJUST_OWNER_LEDGER,
+            self::MANAGE_OWNER_STATEMENTS, self::FINALIZE_OWNER_STATEMENTS,
+            self::MANAGE_OWNER_DISBURSEMENTS,
         ],
         Account::ROLE_PROPERTY_MANAGER => [
             self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_OWNERS, self::VIEW_UNITS,
             self::VIEW_TENANTS, self::VIEW_LEASES, self::VIEW_INVOICES, self::VIEW_PAYMENTS,
             self::VIEW_FINANCIAL_STATEMENTS, self::VIEW_MAINTENANCE, self::VIEW_INSPECTIONS, self::VIEW_ASSETS,
             self::VIEW_CONTRACTS, self::VIEW_AGREEMENTS, self::VIEW_SETTINGS,
+            self::VIEW_EXPENSES, self::VIEW_OWNER_LEDGER, self::VIEW_OWNER_STATEMENTS,
+            self::VIEW_OWNER_DISBURSEMENTS,
             self::MANAGE_PROPERTIES, self::MANAGE_OWNERS, self::MANAGE_UNITS,
             self::MANAGE_TENANTS, self::MANAGE_LEASES, self::MANAGE_MAINTENANCE,
             self::MANAGE_INSPECTIONS, self::MANAGE_ASSETS, self::MANAGE_CONTRACTS,
+            self::MANAGE_EXPENSES,
         ],
         Account::ROLE_ACCOUNTANT => [
             self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_UNITS, self::VIEW_TENANTS,
             self::VIEW_LEASES, self::VIEW_INVOICES, self::VIEW_PAYMENTS, self::VIEW_CONTRACTS,
             self::VIEW_AGREEMENTS, self::VIEW_FINANCIAL_STATEMENTS,
             self::MANAGE_INVOICES, self::MANAGE_PAYMENTS,
+            self::VIEW_EXPENSES, self::MANAGE_EXPENSES, self::POST_EXPENSES,
+            self::VIEW_OWNER_LEDGER, self::ADJUST_OWNER_LEDGER,
+            self::VIEW_OWNER_STATEMENTS, self::MANAGE_OWNER_STATEMENTS,
+            self::FINALIZE_OWNER_STATEMENTS, self::VIEW_OWNER_DISBURSEMENTS,
+            self::MANAGE_OWNER_DISBURSEMENTS,
         ],
         Account::ROLE_MAINTENANCE => [
             self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_UNITS, self::VIEW_TENANTS,
             self::VIEW_LEASES, self::VIEW_MAINTENANCE, self::VIEW_ASSETS,
-            self::MANAGE_MAINTENANCE,
+            self::VIEW_EXPENSES, self::MANAGE_MAINTENANCE, self::INITIATE_MAINTENANCE_EXPENSE,
         ],
         Account::ROLE_VIEWER => [...self::VIEW_CAPABILITIES],
     ];

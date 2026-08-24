@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class MaintenanceTicket extends Model
 {
@@ -69,6 +70,11 @@ class MaintenanceTicket extends Model
     public function lease(): BelongsTo
     {
         return $this->belongsTo(Lease::class);
+    }
+
+    public function propertyExpense(): HasOne
+    {
+        return $this->hasOne(PropertyExpense::class);
     }
 
     // Optional: quick helpers for filtering

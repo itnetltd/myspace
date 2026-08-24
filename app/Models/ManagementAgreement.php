@@ -34,6 +34,9 @@ class ManagementAgreement extends Model
         'end_date',
         'management_fee_type',
         'management_fee_value',
+        'management_fee_percentage',
+        'management_fee_fixed_amount',
+        'fee_migration_review_required',
         'rent_collection_enabled',
         'deposit_management_enabled',
         'maintenance_approval_limit',
@@ -46,6 +49,9 @@ class ManagementAgreement extends Model
         'start_date' => 'date',
         'end_date' => 'date',
         'management_fee_value' => 'decimal:2',
+        'management_fee_percentage' => 'decimal:4',
+        'management_fee_fixed_amount' => 'decimal:2',
+        'fee_migration_review_required' => 'boolean',
         'rent_collection_enabled' => 'boolean',
         'deposit_management_enabled' => 'boolean',
         'maintenance_approval_limit' => 'decimal:2',
@@ -62,6 +68,11 @@ class ManagementAgreement extends Model
     protected static function booted(): void
     {
         $validateAgreement = function (self $agreement) {
+            $agreement->management_fee_value = match ($agreement->management_fee_type) {
+                self::FEE_FIXED => $agreement->management_fee_fixed_amount ?? '0.00',
+                default => $agreement->management_fee_percentage ?? '0.0000',
+            };
+
             $account = Account::query()->find($agreement->account_id);
 
             if (! $account?->isPropertyManagementCompany()) {

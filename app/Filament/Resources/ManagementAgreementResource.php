@@ -48,8 +48,33 @@ class ManagementAgreementResource extends Resource
                     ManagementAgreement::FEE_PERCENTAGE => 'Percentage',
                     ManagementAgreement::FEE_FIXED => 'Fixed',
                     ManagementAgreement::FEE_PERCENTAGE_PLUS_FIXED => 'Percentage plus fixed',
-                ])->required(),
-                Forms\Components\TextInput::make('management_fee_value')->numeric()->minValue(0)->required(),
+                ])->required()->live(),
+                Forms\Components\TextInput::make('management_fee_percentage')
+                    ->label('Management Percentage (%)')
+                    ->numeric()->minValue(0)->maxValue(100)
+                    ->required(fn (Forms\Get $get) => in_array($get('management_fee_type'), [
+                        ManagementAgreement::FEE_PERCENTAGE,
+                        ManagementAgreement::FEE_PERCENTAGE_PLUS_FIXED,
+                    ], true))
+                    ->visible(fn (Forms\Get $get) => in_array($get('management_fee_type'), [
+                        ManagementAgreement::FEE_PERCENTAGE,
+                        ManagementAgreement::FEE_PERCENTAGE_PLUS_FIXED,
+                    ], true)),
+                Forms\Components\TextInput::make('management_fee_fixed_amount')
+                    ->label('Fixed Monthly Fee (RWF)')
+                    ->numeric()->minValue(0)
+                    ->required(fn (Forms\Get $get) => in_array($get('management_fee_type'), [
+                        ManagementAgreement::FEE_FIXED,
+                        ManagementAgreement::FEE_PERCENTAGE_PLUS_FIXED,
+                    ], true))
+                    ->visible(fn (Forms\Get $get) => in_array($get('management_fee_type'), [
+                        ManagementAgreement::FEE_FIXED,
+                        ManagementAgreement::FEE_PERCENTAGE_PLUS_FIXED,
+                    ], true)),
+                Forms\Components\Placeholder::make('fee_migration_warning')
+                    ->content('Legacy percentage-plus-fixed value requires human review; its fixed component was not invented.')
+                    ->visible(fn (?ManagementAgreement $record) => (bool) $record?->fee_migration_review_required)
+                    ->columnSpanFull(),
                 Forms\Components\TextInput::make('maintenance_approval_limit')->numeric()->minValue(0),
                 Forms\Components\Select::make('status')->options([
                     ManagementAgreement::STATUS_DRAFT => 'Draft',
@@ -73,12 +98,24 @@ class ManagementAgreementResource extends Resource
                 Tables\Columns\TextColumn::make('propertyOwner.name')->label('Owner')->searchable(),
                 Tables\Columns\TextColumn::make('property.name')->label('Property')->searchable(),
                 Tables\Columns\TextColumn::make('management_fee_type')->badge(),
-                Tables\Columns\TextColumn::make('management_fee_value')->numeric(decimalPlaces: 2),
+                Tables\Columns\TextColumn::make('management_fee_percentage')->suffix('%'),
+                Tables\Columns\TextColumn::make('management_fee_fixed_amount')->money('RWF'),
                 Tables\Columns\TextColumn::make('start_date')->date(),
                 Tables\Columns\TextColumn::make('end_date')->date(),
                 Tables\Columns\TextColumn::make('status')->badge(),
             ])
-            ->actions([Tables\Actions\EditAction::make()])
+            ->actions([
+                Tables\Actions\Action::make('confirmFeeComponents')
+                    ->label('Confirm Fee Components')
+                    ->icon('heroicon-o-check-circle')
+                    ->requiresConfirmation()
+                    ->modalDescription('Confirm that both fee fields accurately reflect the signed agreement.')
+                    ->visible(fn (ManagementAgreement $record) => $record->fee_migration_review_required)
+                    ->action(fn (ManagementAgreement $record) => $record->forceFill([
+                        'fee_migration_review_required' => false,
+                    ])->save()),
+                Tables\Actions\EditAction::make(),
+            ])
             ->bulkActions([Tables\Actions\DeleteBulkAction::make()]);
     }
 

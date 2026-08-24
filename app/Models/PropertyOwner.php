@@ -58,6 +58,26 @@ class PropertyOwner extends Model
         return $this->hasMany(ManagementAgreement::class);
     }
 
+    public function expenses(): HasMany
+    {
+        return $this->hasMany(PropertyExpense::class);
+    }
+
+    public function ledgerEntries(): HasMany
+    {
+        return $this->hasMany(OwnerLedgerEntry::class);
+    }
+
+    public function disbursements(): HasMany
+    {
+        return $this->hasMany(OwnerDisbursement::class);
+    }
+
+    public function statements(): HasMany
+    {
+        return $this->hasMany(OwnerStatement::class);
+    }
+
     public function selfOwnedAccount(): HasOne
     {
         return $this->hasOne(Account::class, 'self_property_owner_id');
