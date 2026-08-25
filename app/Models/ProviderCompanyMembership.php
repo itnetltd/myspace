@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\BelongsToProviderCompany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Validation\ValidationException;
 
 class ProviderCompanyMembership extends Model
@@ -29,5 +30,10 @@ class ProviderCompanyMembership extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function workOrderAssignments(): HasMany
+    {
+        return $this->hasMany(WorkOrderAssignment::class);
     }
 }

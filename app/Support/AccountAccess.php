@@ -97,6 +97,10 @@ class AccountAccess
 
     public const RECORD_MARKETPLACE_OWNER_APPROVAL = 'marketplace.owner-approval.record';
 
+    public const CONFIRM_MARKETPLACE_APPOINTMENTS = 'marketplace.appointments.confirm';
+
+    public const REVIEW_MARKETPLACE_COMPLETION = 'marketplace.completion.review';
+
     public const APPROVE_PROVIDER_INVOICES = 'marketplace.invoices.approve';
 
     private const VIEW_CAPABILITIES = [
@@ -121,7 +125,8 @@ class AccountAccess
             self::MANAGE_OWNER_STATEMENTS, self::FINALIZE_OWNER_STATEMENTS,
             self::MANAGE_OWNER_DISBURSEMENTS,
             self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES,
-            self::RECORD_MARKETPLACE_OWNER_APPROVAL, self::APPROVE_PROVIDER_INVOICES,
+            self::RECORD_MARKETPLACE_OWNER_APPROVAL, self::CONFIRM_MARKETPLACE_APPOINTMENTS,
+            self::REVIEW_MARKETPLACE_COMPLETION, self::APPROVE_PROVIDER_INVOICES,
         ],
         Account::ROLE_ADMINISTRATOR => [
             ...self::VIEW_CAPABILITIES,
@@ -134,7 +139,8 @@ class AccountAccess
             self::MANAGE_OWNER_STATEMENTS, self::FINALIZE_OWNER_STATEMENTS,
             self::MANAGE_OWNER_DISBURSEMENTS,
             self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES,
-            self::RECORD_MARKETPLACE_OWNER_APPROVAL, self::APPROVE_PROVIDER_INVOICES,
+            self::RECORD_MARKETPLACE_OWNER_APPROVAL, self::CONFIRM_MARKETPLACE_APPOINTMENTS,
+            self::REVIEW_MARKETPLACE_COMPLETION, self::APPROVE_PROVIDER_INVOICES,
         ],
         Account::ROLE_PROPERTY_MANAGER => [
             self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_OWNERS, self::VIEW_UNITS,
@@ -150,6 +156,7 @@ class AccountAccess
             self::MANAGE_EXPENSES,
             self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES,
             self::RECORD_MARKETPLACE_OWNER_APPROVAL,
+            self::CONFIRM_MARKETPLACE_APPOINTMENTS, self::REVIEW_MARKETPLACE_COMPLETION,
         ],
         Account::ROLE_ACCOUNTANT => [
             self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_UNITS, self::VIEW_TENANTS,
