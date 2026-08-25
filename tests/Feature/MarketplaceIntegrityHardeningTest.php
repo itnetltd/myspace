@@ -218,6 +218,7 @@ class MarketplaceIntegrityHardeningTest extends TestCase
 
         $this->useProvider($provider['user'], $provider['company']);
         $work = WorkOrder::firstOrFail();
+        $work->forceFill(['completion_review_required' => false])->save();
         app(WorkOrderService::class)->transition($work, WorkOrder::STATUS_IN_PROGRESS, [], $provider['user']);
         $completed = app(WorkOrderService::class)->transition($work->fresh(), WorkOrder::STATUS_COMPLETED, ['completion_notes' => 'Done'], $provider['user']);
         $this->assertValidationError(
@@ -275,6 +276,7 @@ class MarketplaceIntegrityHardeningTest extends TestCase
         app(QuotationAcceptanceService::class)->accept($invoiceQuote, $owner);
         $this->useProvider($provider['user'], $provider['company']);
         $invoiceWork = WorkOrder::withoutGlobalScopes()->where('service_request_id', $invoiceRequest->id)->firstOrFail();
+        $invoiceWork->forceFill(['completion_review_required' => false])->save();
         app(WorkOrderService::class)->transition($invoiceWork, WorkOrder::STATUS_IN_PROGRESS, [], $provider['user']);
         app(WorkOrderService::class)->transition($invoiceWork->fresh(), WorkOrder::STATUS_COMPLETED, [], $provider['user']);
         $invoice = app(ProviderInvoiceService::class)->saveDraft($invoiceQuote, ['invoice_date' => today()], null, $provider['user']);

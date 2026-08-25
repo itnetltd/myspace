@@ -131,8 +131,8 @@ class ProviderMarketplaceTest extends TestCase
         try {
             app(QuotationAcceptanceService::class)->accept($firstQuote, $viewer);
             $this->fail('Viewer accepted a quotation.');
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
-            $this->assertSame(403, $exception->getStatusCode());
+        } catch (\Illuminate\Auth\Access\AuthorizationException|\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertTrue($exception instanceof \Illuminate\Auth\Access\AuthorizationException || $exception->getStatusCode() === 403);
         }
 
         $this->useAccount($ownerUser, $account);
@@ -206,10 +206,11 @@ class ProviderMarketplaceTest extends TestCase
         try {
             app(WorkOrderService::class)->transition($workOrder, WorkOrder::STATUS_IN_PROGRESS, [], $wrongProvider['user']);
             $this->fail('Wrong provider changed the work order.');
-        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
-            $this->assertSame(403, $exception->getStatusCode());
+        } catch (\Illuminate\Auth\Access\AuthorizationException|\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertTrue($exception instanceof \Illuminate\Auth\Access\AuthorizationException || $exception->getStatusCode() === 403);
         }
         $this->useProvider($provider['user'], $provider['company']);
+        $workOrder->forceFill(['completion_review_required' => false])->save();
         app(WorkOrderService::class)->transition($workOrder, WorkOrder::STATUS_IN_PROGRESS, ['started_at' => now()], $provider['user']);
         app(WorkOrderService::class)->transition($workOrder->fresh(), WorkOrder::STATUS_COMPLETED, [
             'completed_at' => now(), 'completion_notes' => 'Completed',
@@ -253,6 +254,7 @@ class ProviderMarketplaceTest extends TestCase
         app(QuotationAcceptanceService::class)->accept($quote, $ownerUser);
         $this->useProvider($provider['user'], $provider['company']);
         $work = WorkOrder::first();
+        $work->forceFill(['completion_review_required' => false])->save();
         app(WorkOrderService::class)->transition($work, WorkOrder::STATUS_IN_PROGRESS, [], $provider['user']);
         app(WorkOrderService::class)->transition($work->fresh(), WorkOrder::STATUS_COMPLETED, ['completed_at' => now()], $provider['user']);
 
