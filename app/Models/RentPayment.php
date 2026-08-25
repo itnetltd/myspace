@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAccount;
+use App\Services\FinancialPeriodGuard;
 use App\Services\RentPaymentLedgerService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
@@ -28,6 +29,24 @@ class RentPayment extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (RentPayment $payment) {
+            if (! Schema::hasTable('owner_statements')) {
+                return;
+            }
+
+            $invoice = RentInvoice::withoutGlobalScopes()
+                ->with('lease.unit.property')
+                ->find($payment->rent_invoice_id);
+
+            if ($invoice?->lease?->unit?->property?->property_owner_id) {
+                app(FinancialPeriodGuard::class)->ensureOpen(
+                    (int) $payment->account_id,
+                    (int) $invoice->lease->unit->property->property_owner_id,
+                    $payment->paid_on,
+                );
+            }
+        });
+
         static::updating(function (RentPayment $payment) {
             if ($payment->isDirty('rent_invoice_id')) {
                 throw ValidationException::withMessages([
@@ -49,6 +68,20 @@ class RentPayment extends Model
                     throw ValidationException::withMessages([
                         'payment' => 'A finalized owner statement has locked this invoice allocation. Record an adjustment instead.',
                     ]);
+                }
+
+                if ($payment->isDirty('paid_on') && Schema::hasTable('owner_statements')) {
+                    $invoice = RentInvoice::withoutGlobalScopes()
+                        ->with('lease.unit.property')
+                        ->find($payment->rent_invoice_id);
+
+                    if ($invoice?->lease?->unit?->property?->property_owner_id) {
+                        app(FinancialPeriodGuard::class)->ensureOpen(
+                            (int) $payment->account_id,
+                            (int) $invoice->lease->unit->property->property_owner_id,
+                            $payment->paid_on,
+                        );
+                    }
                 }
             }
         });

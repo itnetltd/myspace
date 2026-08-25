@@ -33,6 +33,7 @@ class ListOwnerLedgerEntries extends ListRecords
                         OwnerLedgerEntry::DIRECTION_DEBIT => 'Debit',
                     ])->required(),
                     Forms\Components\TextInput::make('amount')->numeric()->minValue(0.01)->required(),
+                    Forms\Components\DatePicker::make('occurred_on')->default(now())->required(),
                     Forms\Components\Textarea::make('reason')->required(),
                     Forms\Components\TextInput::make('reference')->maxLength(255),
                 ])
@@ -46,6 +47,7 @@ class ListOwnerLedgerEntries extends ListRecords
                         $data['reason'],
                         $data['reference'] ?? null,
                         auth()->user(),
+                        $data['occurred_on'],
                     );
                 }),
         ];

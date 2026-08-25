@@ -6,11 +6,14 @@ use App\Models\OwnerLedgerEntry;
 use App\Models\PropertyOwner;
 use App\Models\User;
 use App\Support\Money;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class OwnerLedgerAdjustmentService
 {
+    public function __construct(private readonly OwnerLedgerService $ledger) {}
+
     public function record(
         PropertyOwner $owner,
         string $amount,
@@ -18,6 +21,7 @@ class OwnerLedgerAdjustmentService
         string $reason,
         ?string $reference,
         User $user,
+        CarbonInterface|string|null $occurredOn = null,
     ): OwnerLedgerEntry {
         if (! in_array($direction, [OwnerLedgerEntry::DIRECTION_CREDIT, OwnerLedgerEntry::DIRECTION_DEBIT], true)) {
             throw ValidationException::withMessages(['direction' => 'Select a valid adjustment direction.']);
@@ -29,22 +33,26 @@ class OwnerLedgerAdjustmentService
             ]);
         }
 
-        return OwnerLedgerEntry::withoutGlobalScopes()->create([
-            'account_id' => $owner->account_id,
-            'property_owner_id' => $owner->getKey(),
-            'entry_number' => 'LE-ADJ-'.Str::upper((string) Str::ulid()),
-            'entry_type' => $direction === OwnerLedgerEntry::DIRECTION_CREDIT
-                ? OwnerLedgerEntry::TYPE_CREDIT_ADJUSTMENT
-                : OwnerLedgerEntry::TYPE_DEBIT_ADJUSTMENT,
-            'direction' => $direction,
-            'amount' => Money::fromMinor(Money::toMinor($amount)),
-            'currency' => $owner->account->currency,
-            'occurred_on' => now()->toDateString(),
-            'description' => trim($reason),
-            'source_type' => 'manual_adjustment',
-            'metadata' => ['reference' => $reference, 'reason' => trim($reason)],
-            'created_by' => $user->getKey(),
-            'posted_at' => now(),
-        ]);
+        $key = Str::upper((string) Str::ulid());
+
+        return $this->ledger->post(
+            ['source_type' => 'manual_adjustment', 'source_id' => 0, 'source_key' => $key],
+            [
+                'account_id' => $owner->account_id,
+                'property_owner_id' => $owner->getKey(),
+                'entry_number' => 'LE-ADJ-'.$key,
+                'entry_type' => $direction === OwnerLedgerEntry::DIRECTION_CREDIT
+                    ? OwnerLedgerEntry::TYPE_CREDIT_ADJUSTMENT
+                    : OwnerLedgerEntry::TYPE_DEBIT_ADJUSTMENT,
+                'direction' => $direction,
+                'amount' => Money::fromMinor(Money::toMinor($amount)),
+                'currency' => $owner->account->currency,
+                'occurred_on' => $occurredOn ?? now()->toDateString(),
+                'description' => trim($reason),
+                'metadata' => ['reference' => $reference, 'reason' => trim($reason)],
+                'created_by' => $user->getKey(),
+                'posted_at' => now(),
+            ],
+        );
     }
 }

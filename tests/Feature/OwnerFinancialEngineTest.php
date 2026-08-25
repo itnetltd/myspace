@@ -128,8 +128,8 @@ class OwnerFinancialEngineTest extends TestCase
         ]);
 
         $service = app(OwnerStatementService::class);
-        $service->generateDraft($portfolio['owner'], '2026-08-01', '2026-08-31', $user);
-        $service->generateDraft($portfolio['owner'], '2026-08-01', '2026-08-31', $user);
+        $service->generateDraft($portfolio['owner'], '2026-08', $user);
+        $service->generateDraft($portfolio['owner'], '2026-08', $user);
 
         $fee = OwnerLedgerEntry::query()->where('entry_type', OwnerLedgerEntry::TYPE_MANAGEMENT_FEE)->sole();
         $this->assertSame($expected, $fee->amount);
@@ -153,7 +153,7 @@ class OwnerFinancialEngineTest extends TestCase
         RentPayment::create(['rent_invoice_id' => $invoice->id, 'paid_on' => '2026-08-10', 'amount' => '500000.00']);
 
         $statement = app(OwnerStatementService::class)
-            ->generateDraft($portfolio['owner'], '2026-08-01', '2026-08-31', $user);
+            ->generateDraft($portfolio['owner'], '2026-08', $user);
 
         $this->assertSame('0.00', $statement->management_fees);
         $this->assertFalse(OwnerLedgerEntry::query()->where('entry_type', OwnerLedgerEntry::TYPE_MANAGEMENT_FEE)->exists());
@@ -166,8 +166,8 @@ class OwnerFinancialEngineTest extends TestCase
         $this->agreement($account, $portfolio, ManagementAgreement::FEE_FIXED, '0.0000', '50000.00');
         $service = app(OwnerStatementService::class);
 
-        $service->generateDraft($portfolio['owner'], '2026-08-01', '2026-08-31', $user);
-        $service->generateDraft($portfolio['owner'], '2026-08-01', '2026-08-31', $user);
+        $service->generateDraft($portfolio['owner'], '2026-08', $user);
+        $service->generateDraft($portfolio['owner'], '2026-08', $user);
 
         $this->assertSame('50000.00', OwnerLedgerEntry::query()
             ->where('entry_type', OwnerLedgerEntry::TYPE_MANAGEMENT_FEE)->sole()->amount);
@@ -197,7 +197,7 @@ class OwnerFinancialEngineTest extends TestCase
 
         $this->expectException(ValidationException::class);
         app(OwnerStatementService::class)
-            ->generateDraft($portfolio['owner'], '2026-08-01', '2026-08-31', $user);
+            ->generateDraft($portfolio['owner'], '2026-08', $user);
     }
 
     public function test_balance_and_statement_totals_include_income_expense_fee_and_disbursement(): void
@@ -225,7 +225,7 @@ class OwnerFinancialEngineTest extends TestCase
         $this->assertSame('300000.00', $disbursementEntry->amount);
 
         $statement = app(OwnerStatementService::class)
-            ->generateDraft($portfolio['owner'], '2026-08-01', '2026-08-31', $user);
+            ->generateDraft($portfolio['owner'], '2026-08', $user);
 
         $this->assertSame('1000000.00', $statement->rent_collected);
         $this->assertSame('100000.00', $statement->expenses);
@@ -255,9 +255,9 @@ class OwnerFinancialEngineTest extends TestCase
         $invoice = $this->invoice($portfolio, '500000.00');
         RentPayment::create(['rent_invoice_id' => $invoice->id, 'paid_on' => '2026-08-10', 'amount' => '500000.00']);
         $service = app(OwnerStatementService::class);
-        $statement = $service->generateDraft($portfolio['owner'], '2026-08-01', '2026-08-31', $user);
+        $statement = $service->generateDraft($portfolio['owner'], '2026-08', $user);
         $lineCount = $statement->lines()->count();
-        $statement = $service->generateDraft($portfolio['owner'], '2026-08-01', '2026-08-31', $user);
+        $statement = $service->generateDraft($portfolio['owner'], '2026-08', $user);
 
         $this->assertSame('200000.00', $statement->opening_balance);
         $this->assertSame('700000.00', $statement->closing_balance);
@@ -269,7 +269,7 @@ class OwnerFinancialEngineTest extends TestCase
         $snapshot = $statement->lines()->pluck('description')->all();
 
         try {
-            $service->generateDraft($portfolio['owner'], '2026-08-01', '2026-08-31', $user);
+            $service->generateDraft($portfolio['owner'], '2026-08', $user);
             $this->fail('Finalized statement regeneration should fail.');
         } catch (ValidationException) {
             $this->assertSame($snapshot, $statement->fresh()->lines()->pluck('description')->all());

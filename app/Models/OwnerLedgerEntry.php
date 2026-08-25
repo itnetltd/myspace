@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAccount;
+use App\Services\FinancialPeriodGuard;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Validation\ValidationException;
@@ -57,11 +58,27 @@ class OwnerLedgerEntry extends Model
 
     protected static function booted(): void
     {
+        static::creating(function (self $entry) {
+            app(FinancialPeriodGuard::class)->ensureOpen(
+                (int) $entry->account_id,
+                (int) $entry->property_owner_id,
+                $entry->occurred_on,
+            );
+        });
+
         static::updating(function (self $entry) {
             if ($entry->getOriginal('locked_at') && $entry->isDirty()) {
                 throw ValidationException::withMessages([
                     'ledger' => 'Ledger entries included in finalized statements are immutable.',
                 ]);
+            }
+
+            if ($entry->isDirty(['account_id', 'property_owner_id', 'occurred_on'])) {
+                app(FinancialPeriodGuard::class)->ensureOpen(
+                    (int) $entry->account_id,
+                    (int) $entry->property_owner_id,
+                    $entry->occurred_on,
+                );
             }
         });
 

@@ -8,6 +8,8 @@ use Illuminate\Validation\ValidationException;
 
 class OwnerLedgerService
 {
+    public function __construct(private readonly FinancialPeriodGuard $periods) {}
+
     public function post(array $source, array $attributes): OwnerLedgerEntry
     {
         $amountMinor = Money::toMinor($attributes['amount'] ?? null);
@@ -49,6 +51,12 @@ class OwnerLedgerService
 
             return $entry;
         }
+
+        $this->periods->ensureOpen(
+            (int) $attributes['account_id'],
+            (int) $attributes['property_owner_id'],
+            $attributes['occurred_on'],
+        );
 
         if ($entry) {
             $entry->fill($values)->save();

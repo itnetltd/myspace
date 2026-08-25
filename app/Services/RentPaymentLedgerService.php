@@ -36,7 +36,11 @@ class RentPaymentLedgerService
                 'currency' => $invoice->account->currency,
                 'occurred_on' => $payment->paid_on,
                 'created_by' => null,
-                'metadata' => ['rent_invoice_id' => $invoice->getKey(), 'payment_amount' => $payment->amount],
+                'metadata' => [
+                    'rent_invoice_id' => $invoice->getKey(),
+                    'payment_amount' => $payment->amount,
+                    'unallocated_amount' => Money::fromMinor($allocation['unallocated_minor']),
+                ],
             ];
 
             $this->syncComponent($invoice->account_id, $payment->getKey(), 'principal', $allocation['principal_minor'], [
@@ -51,12 +55,12 @@ class RentPaymentLedgerService
                 'entry_type' => OwnerLedgerEntry::TYPE_LATE_FEE_INCOME,
                 'description' => "Late fee collected for invoice #{$invoice->getKey()}",
             ]);
-            $this->syncComponent($invoice->account_id, $payment->getKey(), 'unallocated', $allocation['unallocated_minor'], [
-                ...$base,
-                'entry_number' => 'LE-RP-'.$payment->getKey().'-U',
-                'entry_type' => OwnerLedgerEntry::TYPE_CREDIT_ADJUSTMENT,
-                'description' => "Unallocated payment amount for invoice #{$invoice->getKey()}",
-            ]);
+            $this->ledger->removeUnlockedComponent(
+                $invoice->account_id,
+                'rent_payment',
+                $payment->getKey(),
+                'unallocated',
+            );
         }
     }
 

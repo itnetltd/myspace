@@ -28,8 +28,11 @@ class ListOwnerStatements extends ListRecords
                         ->default(fn () => app(CurrentAccount::class)->account()?->self_property_owner_id)
                         ->visible(fn () => app(CurrentAccount::class)->account()?->isPropertyManagementCompany())
                         ->required(),
-                    Forms\Components\DatePicker::make('period_start')->default(now()->startOfMonth())->required(),
-                    Forms\Components\DatePicker::make('period_end')->default(now()->endOfMonth())->required(),
+                    Forms\Components\TextInput::make('statement_month')
+                        ->label('Month')
+                        ->type('month')
+                        ->default(now()->format('Y-m'))
+                        ->required(),
                 ])
                 ->action(function (array $data) {
                     $ownerId = app(CurrentAccount::class)->account()?->isIndividualLandlord()
@@ -38,8 +41,7 @@ class ListOwnerStatements extends ListRecords
                     $owner = PropertyOwner::query()->findOrFail($ownerId);
                     $statement = app(OwnerStatementService::class)->generateDraft(
                         $owner,
-                        $data['period_start'],
-                        $data['period_end'],
+                        $data['statement_month'],
                         auth()->user(),
                     );
                     $this->redirect(OwnerStatementResource::getUrl('view', ['record' => $statement]));

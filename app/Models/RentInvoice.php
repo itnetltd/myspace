@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToAccount;
+use App\Support\Money;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -113,34 +115,56 @@ class RentInvoice extends Model
         return max(0, $total - (float) $this->amount_paid);
     }
 
-    public function calculateLateFee(): float
+    public function calculateLateFee(): string
     {
         if (! $this->due_date) {
-            return 0.0;
+            return '0.00';
         }
 
         $enabled = (int) Setting::get('rent.late_fee_enabled', 1) === 1;
         if (! $enabled) {
-            return 0.0;
+            return '0.00';
         }
 
         $graceDays = (int) Setting::get('rent.late_fee_grace_days', 0);
         $lateAfter = Carbon::parse($this->due_date)->addDays($graceDays)->startOfDay();
 
         if (now()->startOfDay()->lte($lateAfter)) {
-            return 0.0;
+            return '0.00';
+        }
+
+        $baseDueMinor = Money::toMinor($this->amount_due);
+
+        if ($this->principalPaidOnOrBefore($lateAfter) >= $baseDueMinor) {
+            return '0.00';
         }
 
         $type = (string) Setting::get('rent.late_fee_type', 'fixed');
-        $value = (float) Setting::get('rent.late_fee_value', 0);
-
-        $baseDue = (float) $this->amount_due;
+        $value = (string) Setting::get('rent.late_fee_value', '0');
 
         if ($type === 'percent') {
-            return round($baseDue * ($value / 100), 2);
+            return Money::fromMinor(Money::percentage($baseDueMinor, $value));
         }
 
-        return round($value, 2);
+        return Money::fromMinor(Money::toMinor($value));
+    }
+
+    public function principalPaidOnOrBefore(CarbonInterface|string $cutoff): int
+    {
+        $principalRemaining = Money::toMinor($this->amount_due);
+        $principalPaid = 0;
+
+        $this->payments()
+            ->whereDate('paid_on', '<=', Carbon::parse($cutoff)->toDateString())
+            ->orderBy('paid_on')
+            ->orderBy('id')
+            ->each(function (RentPayment $payment) use (&$principalRemaining, &$principalPaid) {
+                $allocated = min(Money::toMinor($payment->amount), max(0, $principalRemaining));
+                $principalPaid += $allocated;
+                $principalRemaining -= $allocated;
+            });
+
+        return $principalPaid;
     }
 
     /**
@@ -149,27 +173,36 @@ class RentInvoice extends Model
      */
     public function refreshPaymentTotals(): void
     {
-        $paid = (float) $this->payments()->sum('amount');
-        $baseDue = (float) $this->amount_due;
+        $paidMinor = 0;
+        $this->payments()->orderBy('paid_on')->orderBy('id')->each(
+            function (RentPayment $payment) use (&$paidMinor) {
+                $paidMinor += Money::toMinor($payment->amount);
+            }
+        );
+        $baseDueMinor = Money::toMinor($this->amount_due);
 
         $lateFee = $this->calculateLateFee();
-        $totalDue = $baseDue + $lateFee;
+        $totalDueMinor = $baseDueMinor + Money::toMinor($lateFee);
 
-        if ($paid <= 0) {
+        if ($paidMinor <= 0) {
             $status = 'unpaid';
-        } elseif ($paid < $totalDue) {
+        } elseif ($paidMinor < $totalDueMinor) {
             $status = 'partial';
         } else {
             $status = 'paid';
         }
 
-        if ($status !== 'paid' && $this->due_date && now()->toDateString() > $this->due_date->toDateString()) {
+        $lateAfter = $this->due_date
+            ? $this->due_date->copy()->addDays((int) Setting::get('rent.late_fee_grace_days', 0))->startOfDay()
+            : null;
+
+        if ($status !== 'paid' && $lateAfter && now()->startOfDay()->gt($lateAfter)) {
             $status = 'overdue';
         }
 
-        $this->amount_paid = $paid;
+        $this->amount_paid = Money::fromMinor($paidMinor);
         $this->late_fee = $lateFee;
-        $this->total_due = $totalDue;
+        $this->total_due = Money::fromMinor($totalDueMinor);
         $this->status = $status;
 
         $this->saveQuietly();

@@ -15,7 +15,9 @@ class RentPaymentResource extends Resource
     protected static ?string $model = RentPayment::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+
     protected static ?string $navigationGroup = 'MySpaces Estate';
+
     protected static ?string $navigationLabel = 'Rent Payments';
 
     public static function form(Form $form): Form
@@ -122,11 +124,6 @@ class RentPaymentResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
             ]);
     }
 

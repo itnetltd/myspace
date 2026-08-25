@@ -12,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Gate;
 
 class ManagementAgreementResource extends Resource
 {
@@ -110,10 +111,12 @@ class ManagementAgreementResource extends Resource
                     ->icon('heroicon-o-check-circle')
                     ->requiresConfirmation()
                     ->modalDescription('Confirm that both fee fields accurately reflect the signed agreement.')
-                    ->visible(fn (ManagementAgreement $record) => $record->fee_migration_review_required)
-                    ->action(fn (ManagementAgreement $record) => $record->forceFill([
-                        'fee_migration_review_required' => false,
-                    ])->save()),
+                    ->visible(fn (ManagementAgreement $record) => $record->fee_migration_review_required
+                        && Gate::allows('update', $record))
+                    ->action(function (ManagementAgreement $record) {
+                        Gate::authorize('update', $record);
+                        $record->forceFill(['fee_migration_review_required' => false])->save();
+                    }),
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([Tables\Actions\DeleteBulkAction::make()]);

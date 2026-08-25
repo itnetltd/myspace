@@ -2,11 +2,14 @@
 
 namespace App\Filament\Resources\RentInvoiceResource\RelationManagers;
 
+use App\Models\RentPayment;
+use App\Services\RentPaymentService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class PaymentsRelationManager extends RelationManager
 {
@@ -34,11 +37,17 @@ class PaymentsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                Tables\Actions\CreateAction::make()
+                    ->using(function (array $data): Model {
+                        $data['rent_invoice_id'] = $this->getOwnerRecord()->getKey();
+
+                        return app(RentPaymentService::class)->create($data);
+                    }),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->using(fn (RentPayment $record, array $data): Model => app(RentPaymentService::class)
+                        ->update($record, $data)),
             ]);
     }
 }

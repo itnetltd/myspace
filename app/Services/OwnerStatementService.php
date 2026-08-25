@@ -18,21 +18,17 @@ class OwnerStatementService
         private readonly OwnerBalanceService $balances,
     ) {}
 
-    public function generateDraft(PropertyOwner $owner, string $periodStart, string $periodEnd, User $user): OwnerStatement
+    public function generateDraft(PropertyOwner $owner, string $statementMonth, User $user): OwnerStatement
     {
-        $start = Carbon::parse($periodStart)->startOfDay();
-        $end = Carbon::parse($periodEnd)->endOfDay();
-
-        if ($start->gt($end)) {
-            throw ValidationException::withMessages(['period_end' => 'The statement end date must follow its start date.']);
-        }
+        $start = Carbon::parse(preg_match('/^\d{4}-\d{2}$/', $statementMonth) ? $statementMonth.'-01' : $statementMonth)
+            ->startOfMonth();
+        $end = $start->copy()->endOfMonth();
 
         return DB::transaction(function () use ($owner, $start, $end, $user) {
             $statement = OwnerStatement::withoutGlobalScopes()
                 ->where('account_id', $owner->account_id)
                 ->where('property_owner_id', $owner->getKey())
-                ->whereDate('period_start', $start)
-                ->whereDate('period_end', $end)
+                ->where('statement_month', $start->format('Y-m'))
                 ->lockForUpdate()
                 ->first();
 
@@ -53,6 +49,15 @@ class OwnerStatementService
                 ->orderBy('id')
                 ->get();
 
+            $foreignAssignment = $entries->first(fn (OwnerLedgerEntry $entry) => $entry->owner_statement_id
+                && (int) $entry->owner_statement_id !== (int) $statement?->getKey());
+
+            if ($foreignAssignment) {
+                throw ValidationException::withMessages([
+                    'ledger' => "Ledger entry {$foreignAssignment->entry_number} is already assigned to another owner statement.",
+                ]);
+            }
+
             $openingMinor = Money::toMinor($this->balances->balance($owner, null, null, $start->copy()->subDay()));
             $totals = $this->totals($entries);
             $netMinor = $totals['credits'] - $totals['debits'];
@@ -60,6 +65,7 @@ class OwnerStatementService
                 'account_id' => $owner->account_id,
                 'property_owner_id' => $owner->getKey(),
                 'statement_number' => 'OS-'.$owner->getKey().'-'.$start->format('Ymd').'-'.$end->format('Ymd'),
+                'statement_month' => $start->format('Y-m'),
                 'period_start' => $start->toDateString(),
                 'period_end' => $end->toDateString(),
                 'status' => OwnerStatement::STATUS_DRAFT,
@@ -84,6 +90,10 @@ class OwnerStatementService
                 OwnerLedgerEntry::withoutGlobalScopes()
                     ->where('owner_statement_id', $statement->getKey())
                     ->whereNull('locked_at')
+                    ->where(function ($query) use ($start, $end) {
+                        $query->whereDate('occurred_on', '<', $start->toDateString())
+                            ->orWhereDate('occurred_on', '>', $end->toDateString());
+                    })
                     ->update(['owner_statement_id' => null]);
             } else {
                 $statement = OwnerStatement::withoutGlobalScopes()->create($attributes);
@@ -113,6 +123,10 @@ class OwnerStatementService
             OwnerLedgerEntry::withoutGlobalScopes()
                 ->whereKey($entries->modelKeys())
                 ->whereNull('locked_at')
+                ->where(function ($query) use ($statement) {
+                    $query->whereNull('owner_statement_id')
+                        ->orWhere('owner_statement_id', $statement->getKey());
+                })
                 ->update(['owner_statement_id' => $statement->getKey()]);
 
             return $statement->fresh(['lines', 'propertyOwner']);

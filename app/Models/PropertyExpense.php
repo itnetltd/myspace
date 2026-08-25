@@ -81,6 +81,43 @@ class PropertyExpense extends Model
                 ]);
             }
 
+            $unit = $expense->unit_id
+                ? Unit::withoutGlobalScopes()->find($expense->unit_id)
+                : null;
+
+            if ($expense->unit_id && (! $unit || (int) $unit->property_id !== (int) $expense->property_id)) {
+                throw ValidationException::withMessages([
+                    'unit_id' => 'The selected unit does not belong to the selected property.',
+                ]);
+            }
+
+            $lease = $expense->lease_id
+                ? Lease::withoutGlobalScopes()->find($expense->lease_id)
+                : null;
+
+            if ($expense->lease_id && (! $lease || ! $unit || (int) $lease->unit_id !== (int) $unit->getKey())) {
+                throw ValidationException::withMessages([
+                    'lease_id' => 'The selected lease does not belong to the selected unit.',
+                ]);
+            }
+
+            $ticket = $expense->maintenance_ticket_id
+                ? MaintenanceTicket::withoutGlobalScopes()->find($expense->maintenance_ticket_id)
+                : null;
+
+            if ($expense->maintenance_ticket_id
+                && (! $ticket || ! $unit || (int) $ticket->unit_id !== (int) $unit->getKey())) {
+                throw ValidationException::withMessages([
+                    'maintenance_ticket_id' => 'The maintenance ticket does not belong to the selected unit.',
+                ]);
+            }
+
+            if ($ticket?->lease_id && (int) $ticket->lease_id !== (int) $expense->lease_id) {
+                throw ValidationException::withMessages([
+                    'maintenance_ticket_id' => 'The maintenance ticket lease is incompatible with the selected lease.',
+                ]);
+            }
+
             if ($expense->isDirty('status') && $expense->status === self::STATUS_POSTED) {
                 throw ValidationException::withMessages([
                     'status' => 'Use the controlled Post Expense action to create the ledger entry.',
