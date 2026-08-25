@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use App\Support\CurrentAccount;
+use App\Support\CurrentProviderCompany;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     use HasFactory, HasRoles, Notifiable;
 
@@ -19,6 +22,7 @@ class User extends Authenticatable
 
         // ✅ Multi-account current workspace
         'current_account_id',
+        'current_provider_company_id',
     ];
 
     protected $hidden = [
@@ -55,6 +59,18 @@ class User extends Authenticatable
     public function currentAccount()
     {
         return $this->belongsTo(Account::class, 'current_account_id');
+    }
+
+    public function providerCompanies()
+    {
+        return $this->belongsToMany(ProviderCompany::class, 'provider_company_memberships')
+            ->withPivot(['role', 'is_active'])
+            ->withTimestamps();
+    }
+
+    public function providerMemberships()
+    {
+        return $this->hasMany(ProviderCompanyMembership::class);
     }
 
     /**
@@ -107,5 +123,14 @@ class User extends Authenticatable
         $role = $this->roleInAccount($accountId);
 
         return $role ? in_array($role, $roles, true) : false;
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return match ($panel->getId()) {
+            'admin' => (bool) app(CurrentAccount::class)->forUser($this),
+            'provider' => (bool) app(CurrentProviderCompany::class)->forUser($this),
+            default => false,
+        };
     }
 }

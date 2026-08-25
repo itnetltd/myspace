@@ -6,6 +6,7 @@ use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
 
 class Inspection extends Model
@@ -48,6 +49,11 @@ class Inspection extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(InspectionLine::class);
+    }
+
+    public function externalServiceRequest(): HasOne
+    {
+        return $this->hasOne(ServiceRequest::class);
     }
 
     /**

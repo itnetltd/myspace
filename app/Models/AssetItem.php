@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToAccount;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssetItem extends Model
@@ -31,5 +32,14 @@ class AssetItem extends Model
     public function inspectionLines(): HasMany
     {
         return $this->hasMany(InspectionLine::class);
+    }
+
+    public function supplierProducts(): BelongsToMany
+    {
+        return $this->belongsToMany(SupplierProduct::class)
+            ->withoutGlobalScopes()
+            ->using(AssetItemSupplierProduct::class)
+            ->withPivot(['match_type', 'notes', 'matched_by'])
+            ->withTimestamps();
     }
 }

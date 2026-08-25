@@ -89,6 +89,14 @@ class AccountAccess
 
     public const MANAGE_OWNER_DISBURSEMENTS = 'owner-disbursements.manage';
 
+    public const VIEW_MARKETPLACE = 'marketplace.view';
+
+    public const MANAGE_MARKETPLACE = 'marketplace.manage';
+
+    public const ACCEPT_MARKETPLACE_QUOTES = 'marketplace.quotes.accept';
+
+    public const APPROVE_PROVIDER_INVOICES = 'marketplace.invoices.approve';
+
     private const VIEW_CAPABILITIES = [
         self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_OWNERS, self::VIEW_UNITS,
         self::VIEW_TENANTS, self::VIEW_LEASES, self::VIEW_INVOICES, self::VIEW_PAYMENTS,
@@ -96,6 +104,7 @@ class AccountAccess
         self::VIEW_CONTRACTS, self::VIEW_AGREEMENTS, self::VIEW_SETTINGS,
         self::VIEW_EXPENSES, self::VIEW_OWNER_LEDGER, self::VIEW_OWNER_STATEMENTS,
         self::VIEW_OWNER_DISBURSEMENTS,
+        self::VIEW_MARKETPLACE,
     ];
 
     private const ROLE_CAPABILITIES = [
@@ -109,6 +118,7 @@ class AccountAccess
             self::MANAGE_EXPENSES, self::POST_EXPENSES, self::ADJUST_OWNER_LEDGER,
             self::MANAGE_OWNER_STATEMENTS, self::FINALIZE_OWNER_STATEMENTS,
             self::MANAGE_OWNER_DISBURSEMENTS,
+            self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES, self::APPROVE_PROVIDER_INVOICES,
         ],
         Account::ROLE_ADMINISTRATOR => [
             ...self::VIEW_CAPABILITIES,
@@ -120,6 +130,7 @@ class AccountAccess
             self::MANAGE_EXPENSES, self::POST_EXPENSES, self::ADJUST_OWNER_LEDGER,
             self::MANAGE_OWNER_STATEMENTS, self::FINALIZE_OWNER_STATEMENTS,
             self::MANAGE_OWNER_DISBURSEMENTS,
+            self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES, self::APPROVE_PROVIDER_INVOICES,
         ],
         Account::ROLE_PROPERTY_MANAGER => [
             self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_OWNERS, self::VIEW_UNITS,
@@ -128,26 +139,31 @@ class AccountAccess
             self::VIEW_CONTRACTS, self::VIEW_AGREEMENTS, self::VIEW_SETTINGS,
             self::VIEW_EXPENSES, self::VIEW_OWNER_LEDGER, self::VIEW_OWNER_STATEMENTS,
             self::VIEW_OWNER_DISBURSEMENTS,
+            self::VIEW_MARKETPLACE,
             self::MANAGE_PROPERTIES, self::MANAGE_OWNERS, self::MANAGE_UNITS,
             self::MANAGE_TENANTS, self::MANAGE_LEASES, self::MANAGE_MAINTENANCE,
             self::MANAGE_INSPECTIONS, self::MANAGE_ASSETS, self::MANAGE_CONTRACTS,
             self::MANAGE_EXPENSES,
+            self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES,
         ],
         Account::ROLE_ACCOUNTANT => [
             self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_UNITS, self::VIEW_TENANTS,
             self::VIEW_LEASES, self::VIEW_INVOICES, self::VIEW_PAYMENTS, self::VIEW_CONTRACTS,
             self::VIEW_AGREEMENTS, self::VIEW_FINANCIAL_STATEMENTS,
+            self::VIEW_MARKETPLACE,
             self::MANAGE_INVOICES, self::MANAGE_PAYMENTS,
             self::VIEW_EXPENSES, self::MANAGE_EXPENSES, self::POST_EXPENSES,
             self::VIEW_OWNER_LEDGER, self::ADJUST_OWNER_LEDGER,
             self::VIEW_OWNER_STATEMENTS, self::MANAGE_OWNER_STATEMENTS,
             self::FINALIZE_OWNER_STATEMENTS, self::VIEW_OWNER_DISBURSEMENTS,
             self::MANAGE_OWNER_DISBURSEMENTS,
+            self::APPROVE_PROVIDER_INVOICES,
         ],
         Account::ROLE_MAINTENANCE => [
             self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_UNITS, self::VIEW_TENANTS,
             self::VIEW_LEASES, self::VIEW_MAINTENANCE, self::VIEW_ASSETS,
             self::VIEW_EXPENSES, self::MANAGE_MAINTENANCE, self::INITIATE_MAINTENANCE_EXPENSE,
+            self::VIEW_MARKETPLACE, self::MANAGE_MARKETPLACE,
         ],
         Account::ROLE_VIEWER => [...self::VIEW_CAPABILITIES],
     ];

@@ -95,6 +95,16 @@ class Account extends Model
         return $this->hasMany(ManagementAgreement::class);
     }
 
+    public function serviceRequests(): HasMany
+    {
+        return $this->hasMany(ServiceRequest::class);
+    }
+
+    public function providerInvoices(): HasMany
+    {
+        return $this->hasMany(ProviderInvoice::class);
+    }
+
     public function contractTemplates(): HasMany
     {
         return $this->hasMany(ContractTemplate::class);

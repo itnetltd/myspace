@@ -43,6 +43,7 @@ class PropertyExpense extends Model
         'document_path', 'notes', 'owner_approval_required', 'owner_approved_at',
         'owner_approved_by', 'approved_at', 'approved_by', 'source_type', 'source_id',
         'created_by',
+        'provider_invoice_id',
     ];
 
     protected $casts = [
@@ -63,6 +64,7 @@ class PropertyExpense extends Model
             'unit_id' => Unit::class,
             'lease_id' => Lease::class,
             'maintenance_ticket_id' => MaintenanceTicket::class,
+            'provider_invoice_id' => ProviderInvoice::class,
         ];
     }
 
@@ -181,5 +183,10 @@ class PropertyExpense extends Model
     public function ownerApprovalRecorder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_approved_by');
+    }
+
+    public function providerInvoice(): BelongsTo
+    {
+        return $this->belongsTo(ProviderInvoice::class);
     }
 }

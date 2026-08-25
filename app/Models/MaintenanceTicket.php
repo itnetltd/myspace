@@ -77,6 +77,11 @@ class MaintenanceTicket extends Model
         return $this->hasOne(PropertyExpense::class);
     }
 
+    public function serviceRequest(): HasOne
+    {
+        return $this->hasOne(ServiceRequest::class);
+    }
+
     // Optional: quick helpers for filtering
     public function scopeOpen($query)
     {
