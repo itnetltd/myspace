@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Provider\Widgets\ProviderOperationsOverview;
 use App\Http\Middleware\EnsureCurrentProviderCompany;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -31,7 +32,7 @@ class ProviderPanelProvider extends PanelProvider
             ->colors(['primary' => Color::Blue])
             ->discoverResources(in: app_path('Filament/Provider/Resources'), for: 'App\\Filament\\Provider\\Resources')
             ->pages([Pages\Dashboard::class])
-            ->widgets([Widgets\AccountWidget::class])
+            ->widgets([Widgets\AccountWidget::class, ProviderOperationsOverview::class])
             ->middleware([
                 EncryptCookies::class, AddQueuedCookiesToResponse::class, StartSession::class,
                 AuthenticateSession::class, ShareErrorsFromSession::class, VerifyCsrfToken::class,
