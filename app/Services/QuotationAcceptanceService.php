@@ -20,6 +20,7 @@ class QuotationAcceptanceService
     public function __construct(
         private readonly ManagementAgreementResolver $agreements,
         private readonly MarketplaceNumberGenerator $numbers,
+        private readonly WorkOrderActivityService $activities,
     ) {}
 
     public function accept(Quotation $quotation, User $user): Quotation
@@ -102,11 +103,14 @@ class QuotationAcceptanceService
                 'owner_approval_required' => $requiresApproval,
             ])->saveQuietly();
 
-            WorkOrder::withoutGlobalScopes()->create([
+            $workOrder = WorkOrder::withoutGlobalScopes()->create([
                 'service_request_id' => $request->getKey(), 'quotation_id' => $quotation->getKey(),
                 'provider_company_id' => $quotation->provider_company_id,
                 'work_order_number' => $this->numbers->next('work_order'),
                 'status' => WorkOrder::STATUS_PENDING, 'created_by' => $user->getKey(),
+            ]);
+            $this->activities->record($workOrder, 'work_order_created', 'Work order created from the accepted quotation.', $user, [
+                'quotation_id' => $quotation->getKey(), 'service_request_id' => $request->getKey(),
             ]);
 
             ProviderCompany::find($quotation->provider_company_id)?->users()
