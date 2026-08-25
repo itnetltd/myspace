@@ -96,6 +96,14 @@ class ServiceAppointmentService
                 'appointment_id' => $appointment->getKey(),
             ]);
             $this->notifyAssigned($workOrder, 'Appointment confirmed', $appointment);
+            $request = ServiceRequest::withoutGlobalScopes()->findOrFail($workOrder->service_request_id);
+            if ($request->created_by && (int) $request->created_by !== (int) $user->getKey()) {
+                $request->creator?->notify(new MarketplaceNotification([
+                    'title' => 'Appointment confirmed', 'work_order_id' => $workOrder->getKey(),
+                    'appointment_id' => $appointment->getKey(),
+                    'scheduled_start' => $appointment->scheduled_start->toIso8601String(),
+                ]));
+            }
 
             return $appointment->refresh();
         });
