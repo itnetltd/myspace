@@ -27,6 +27,9 @@ class QuotationResource extends Resource
             Forms\Components\Select::make('service_request_id')->label('Invited request')->required()->searchable()
                 ->options(fn () => ProviderInvitation::where('provider_company_id', app(CurrentProviderCompany::class)->id())
                     ->whereIn('status', [ProviderInvitation::STATUS_INVITED, ProviderInvitation::STATUS_VIEWED])
+                    ->whereHas('serviceRequest', fn ($query) => $query->withoutGlobalScopes()->whereIn('status', [
+                        \App\Models\ServiceRequest::STATUS_REQUESTED, \App\Models\ServiceRequest::STATUS_QUOTES_RECEIVED,
+                    ]))
                     ->with(['serviceRequest' => fn ($query) => $query->withoutGlobalScopes()])
                     ->get()->mapWithKeys(fn ($invitation) => [$invitation->service_request_id => $invitation->serviceRequest?->request_number.' — '.$invitation->serviceRequest?->title])),
             Forms\Components\TextInput::make('currency')->default('RWF')->required()->maxLength(3),
@@ -65,7 +68,10 @@ class QuotationResource extends Resource
         ])->actions([
             Tables\Actions\EditAction::make()->visible(fn (Quotation $record) => $record->status === Quotation::STATUS_DRAFT),
             Tables\Actions\Action::make('submit')->requiresConfirmation()
-                ->visible(fn (Quotation $record) => $record->status === Quotation::STATUS_DRAFT)
+                ->visible(fn (Quotation $record) => $record->status === Quotation::STATUS_DRAFT
+                    && in_array($record->serviceRequest?->status, [
+                        \App\Models\ServiceRequest::STATUS_REQUESTED, \App\Models\ServiceRequest::STATUS_QUOTES_RECEIVED,
+                    ], true))
                 ->action(fn (Quotation $record) => app(QuotationService::class)->submit($record, auth()->user())),
         ]);
     }
@@ -78,5 +84,11 @@ class QuotationResource extends Resource
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
         return parent::getEloquentQuery()->with(['serviceRequest' => fn ($query) => $query->withoutGlobalScopes()]);
+    }
+
+    public static function canCreate(): bool
+    {
+        return app(CurrentProviderCompany::class)->company()?->isActive() === true
+            && parent::canCreate();
     }
 }

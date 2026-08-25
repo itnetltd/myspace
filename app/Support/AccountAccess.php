@@ -95,6 +95,8 @@ class AccountAccess
 
     public const ACCEPT_MARKETPLACE_QUOTES = 'marketplace.quotes.accept';
 
+    public const RECORD_MARKETPLACE_OWNER_APPROVAL = 'marketplace.owner-approval.record';
+
     public const APPROVE_PROVIDER_INVOICES = 'marketplace.invoices.approve';
 
     private const VIEW_CAPABILITIES = [
@@ -118,7 +120,8 @@ class AccountAccess
             self::MANAGE_EXPENSES, self::POST_EXPENSES, self::ADJUST_OWNER_LEDGER,
             self::MANAGE_OWNER_STATEMENTS, self::FINALIZE_OWNER_STATEMENTS,
             self::MANAGE_OWNER_DISBURSEMENTS,
-            self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES, self::APPROVE_PROVIDER_INVOICES,
+            self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES,
+            self::RECORD_MARKETPLACE_OWNER_APPROVAL, self::APPROVE_PROVIDER_INVOICES,
         ],
         Account::ROLE_ADMINISTRATOR => [
             ...self::VIEW_CAPABILITIES,
@@ -130,7 +133,8 @@ class AccountAccess
             self::MANAGE_EXPENSES, self::POST_EXPENSES, self::ADJUST_OWNER_LEDGER,
             self::MANAGE_OWNER_STATEMENTS, self::FINALIZE_OWNER_STATEMENTS,
             self::MANAGE_OWNER_DISBURSEMENTS,
-            self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES, self::APPROVE_PROVIDER_INVOICES,
+            self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES,
+            self::RECORD_MARKETPLACE_OWNER_APPROVAL, self::APPROVE_PROVIDER_INVOICES,
         ],
         Account::ROLE_PROPERTY_MANAGER => [
             self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_OWNERS, self::VIEW_UNITS,
@@ -145,6 +149,7 @@ class AccountAccess
             self::MANAGE_INSPECTIONS, self::MANAGE_ASSETS, self::MANAGE_CONTRACTS,
             self::MANAGE_EXPENSES,
             self::MANAGE_MARKETPLACE, self::ACCEPT_MARKETPLACE_QUOTES,
+            self::RECORD_MARKETPLACE_OWNER_APPROVAL,
         ],
         Account::ROLE_ACCOUNTANT => [
             self::VIEW_ACCOUNT, self::VIEW_PROPERTIES, self::VIEW_UNITS, self::VIEW_TENANTS,

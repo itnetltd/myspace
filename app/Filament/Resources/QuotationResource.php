@@ -5,6 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\QuotationResource\Pages;
 use App\Models\Quotation;
 use App\Services\QuotationAcceptanceService;
+use App\Services\ServiceRequestService;
+use App\Support\AccountAccess;
+use App\Support\CurrentAccount;
+use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -28,8 +32,20 @@ class QuotationResource extends Resource
             Tables\Columns\TextColumn::make('warranty_notes')->wrap(),
             Tables\Columns\TextColumn::make('status')->badge(),
         ])->actions([
+            Tables\Actions\Action::make('recordOwnerApproval')
+                ->label('Record owner approval')
+                ->form([Forms\Components\Textarea::make('reference')->required()])
+                ->visible(fn (Quotation $record) => $record->status === Quotation::STATUS_SUBMITTED
+                    && app(AccountAccess::class)->can(
+                        auth()->user(), app(CurrentAccount::class)->account(), AccountAccess::RECORD_MARKETPLACE_OWNER_APPROVAL,
+                    ))
+                ->action(fn (Quotation $record, array $data) => app(ServiceRequestService::class)
+                    ->recordOwnerApproval($record->serviceRequest()->withoutGlobalScopes()->firstOrFail(), $record, auth()->user(), $data['reference'])),
             Tables\Actions\Action::make('accept')->requiresConfirmation()
-                ->visible(fn (Quotation $record) => $record->status === Quotation::STATUS_SUBMITTED && auth()->user()->can('accept', $record))
+                ->visible(fn (Quotation $record) => $record->status === Quotation::STATUS_SUBMITTED
+                    && ! $record->valid_until?->lt(today())
+                    && in_array($record->serviceRequest?->status, [\App\Models\ServiceRequest::STATUS_REQUESTED, \App\Models\ServiceRequest::STATUS_QUOTES_RECEIVED], true)
+                    && auth()->user()->can('accept', $record))
                 ->action(fn (Quotation $record) => app(QuotationAcceptanceService::class)->accept($record, auth()->user())),
         ]);
     }

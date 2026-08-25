@@ -47,6 +47,11 @@ class ProviderCompany extends Model
         return $this->hasMany(ProviderCompanyMembership::class);
     }
 
+    public function staffInvitations(): HasMany
+    {
+        return $this->hasMany(ProviderStaffInvitation::class);
+    }
+
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'provider_company_memberships')->withPivot(['role', 'is_active'])->withTimestamps();
@@ -65,5 +70,10 @@ class ProviderCompany extends Model
     public function quotations(): HasMany
     {
         return $this->hasMany(Quotation::class);
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === self::STATUS_ACTIVE;
     }
 }

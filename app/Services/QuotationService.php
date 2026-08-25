@@ -23,10 +23,14 @@ class QuotationService
     public function saveDraft(ServiceRequest $request, ProviderCompany $provider, array $attributes, array $lines, User $user): Quotation
     {
         $this->authorizeProvider($provider, $user);
-        $invitation = $this->eligibleInvitation($request, $provider);
         $calculation = $this->calculator->calculate($lines, $attributes['delivery_amount'] ?? null);
 
-        return DB::transaction(function () use ($request, $provider, $attributes, $calculation, $user, $invitation) {
+        return DB::transaction(function () use ($request, $provider, $attributes, $calculation, $user) {
+            $provider = ProviderCompany::lockForUpdate()->findOrFail($provider->getKey());
+            $this->ensureActiveProvider($provider);
+            $request = ServiceRequest::withoutGlobalScopes()->lockForUpdate()->findOrFail($request->getKey());
+            $this->assertRequestAcceptsQuotes($request);
+            $invitation = $this->eligibleInvitation($request, $provider, true);
             $quotation = Quotation::withoutGlobalScopes()->firstOrNew([
                 'service_request_id' => $request->getKey(), 'provider_company_id' => $provider->getKey(),
             ]);
@@ -62,18 +66,21 @@ class QuotationService
         $this->authorizeProvider($provider, $user);
 
         return DB::transaction(function () use ($quotation, $user) {
+            $provider = ProviderCompany::lockForUpdate()->findOrFail($quotation->provider_company_id);
+            $this->ensureActiveProvider($provider);
+            $request = ServiceRequest::withoutGlobalScopes()->lockForUpdate()->findOrFail($quotation->service_request_id);
+            $this->assertRequestAcceptsQuotes($request);
             $quotation = Quotation::withoutGlobalScopes()->lockForUpdate()->findOrFail($quotation->getKey());
             if ($quotation->status !== Quotation::STATUS_DRAFT || ! $quotation->lines()->exists()) {
                 throw ValidationException::withMessages(['quotation' => 'Only a complete draft quotation can be submitted.']);
             }
-            $request = ServiceRequest::withoutGlobalScopes()->findOrFail($quotation->service_request_id);
-            $this->eligibleInvitation($request, ProviderCompany::findOrFail($quotation->provider_company_id));
+            $this->eligibleInvitation($request, ProviderCompany::findOrFail($quotation->provider_company_id), true);
 
             $quotation->forceFill(['status' => Quotation::STATUS_SUBMITTED, 'submitted_at' => now(), 'submitted_by' => $user->getKey()])->save();
             ProviderInvitation::where('service_request_id', $request->getKey())
                 ->where('provider_company_id', $quotation->provider_company_id)
                 ->update(['status' => ProviderInvitation::STATUS_QUOTED, 'responded_at' => now()]);
-            ServiceRequest::withoutGlobalScopes()->whereKey($request->getKey())->update(['status' => ServiceRequest::STATUS_QUOTES_RECEIVED]);
+            $request->forceFill(['status' => ServiceRequest::STATUS_QUOTES_RECEIVED])->saveQuietly();
             $request->creator?->notify(new MarketplaceNotification([
                 'title' => 'New quotation received', 'service_request_id' => $request->getKey(),
                 'quotation_id' => $quotation->getKey(),
@@ -83,14 +90,19 @@ class QuotationService
         });
     }
 
-    private function eligibleInvitation(ServiceRequest $request, ProviderCompany $provider): ProviderInvitation
+    private function eligibleInvitation(ServiceRequest $request, ProviderCompany $provider, bool $lock = false): ProviderInvitation
     {
-        $invitation = ProviderInvitation::query()
+        $query = ProviderInvitation::query()
             ->where('service_request_id', $request->getKey())
-            ->where('provider_company_id', $provider->getKey())->first();
+            ->where('provider_company_id', $provider->getKey());
+        $invitation = ($lock ? $query->lockForUpdate() : $query)->first();
 
-        if (! $invitation || $invitation->status === ProviderInvitation::STATUS_DECLINED
-            || ($invitation->expires_at && $invitation->expires_at->isPast())) {
+        if ($invitation?->expires_at && $invitation->expires_at->isPast()) {
+            $invitation->forceFill(['status' => ProviderInvitation::STATUS_EXPIRED])->save();
+        }
+        if (! $invitation || ! in_array($invitation->status, [
+            ProviderInvitation::STATUS_INVITED, ProviderInvitation::STATUS_VIEWED,
+        ], true)) {
             throw ValidationException::withMessages(['invitation' => 'This provider is not invited or eligible to quote for the request.']);
         }
 
@@ -99,8 +111,24 @@ class QuotationService
 
     private function authorizeProvider(ProviderCompany $provider, User $user): void
     {
+        $provider = ProviderCompany::findOrFail($provider->getKey());
+        $this->ensureActiveProvider($provider);
         if (! app(ProviderAccess::class)->hasRole($user, $provider, ProviderAccess::QUOTE_ROLES)) {
             abort(403);
+        }
+    }
+
+    private function ensureActiveProvider(ProviderCompany $provider): void
+    {
+        if (! $provider->isActive()) {
+            throw ValidationException::withMessages(['provider' => 'Only active providers may prepare or submit quotations.']);
+        }
+    }
+
+    private function assertRequestAcceptsQuotes(ServiceRequest $request): void
+    {
+        if (! in_array($request->status, [ServiceRequest::STATUS_REQUESTED, ServiceRequest::STATUS_QUOTES_RECEIVED], true)) {
+            throw ValidationException::withMessages(['service_request' => 'This service request no longer accepts quotations.']);
         }
     }
 

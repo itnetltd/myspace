@@ -17,6 +17,8 @@ class ProviderInvitation extends Model
 
     public const STATUS_EXPIRED = 'expired';
 
+    public const STATUS_NOT_SELECTED = 'not_selected';
+
     protected $fillable = [
         'service_request_id', 'provider_company_id', 'status', 'invited_at',
         'viewed_at', 'responded_at', 'expires_at', 'invited_by',

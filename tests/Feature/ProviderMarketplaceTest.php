@@ -185,7 +185,7 @@ class ProviderMarketplaceTest extends TestCase
         }
         $this->assertTrue($request->fresh()->owner_approval_required);
 
-        app(ServiceRequestService::class)->recordOwnerApproval($request->fresh(), $ownerUser, 'Email approval REF-123');
+        app(ServiceRequestService::class)->recordOwnerApproval($request->fresh(), $quote, $ownerUser, 'Email approval REF-123');
         $this->assertSame(Quotation::STATUS_ACCEPTED, app(QuotationAcceptanceService::class)->accept($quote, $ownerUser)->status);
     }
 

@@ -21,7 +21,6 @@ class ProviderCompanyMembershipResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\Select::make('user_id')->relationship('user', 'email')->searchable()->preload()->required(),
             Forms\Components\Select::make('role')->options(array_combine(ProviderCompanyMembership::ROLES, ProviderCompanyMembership::ROLES))->required(),
             Forms\Components\Toggle::make('is_active')->default(true),
         ]);
@@ -37,6 +36,6 @@ class ProviderCompanyMembershipResource extends Resource
 
     public static function getPages(): array
     {
-        return ['index' => Pages\ListProviderCompanyMemberships::route('/'), 'create' => Pages\CreateProviderCompanyMembership::route('/create'), 'edit' => Pages\EditProviderCompanyMembership::route('/{record}/edit')];
+        return ['index' => Pages\ListProviderCompanyMemberships::route('/'), 'edit' => Pages\EditProviderCompanyMembership::route('/{record}/edit')];
     }
 }

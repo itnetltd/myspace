@@ -46,12 +46,14 @@ class ServiceRequest extends Model
         'maintenance_ticket_id', 'inspection_id', 'request_number', 'request_type',
         'title', 'description', 'priority', 'status', 'required_by', 'created_by',
         'accepted_quotation_id', 'owner_approval_required', 'owner_approved_at',
+        'owner_approved_quotation_id', 'owner_approved_amount', 'owner_approved_currency',
         'owner_approved_by', 'owner_approval_reference',
     ];
 
     protected $casts = [
         'required_by' => 'date',
         'owner_approval_required' => 'boolean',
+        'owner_approved_amount' => 'decimal:2',
         'owner_approved_at' => 'datetime',
     ];
 
@@ -108,6 +110,11 @@ class ServiceRequest extends Model
     public function acceptedQuotation(): BelongsTo
     {
         return $this->belongsTo(Quotation::class, 'accepted_quotation_id');
+    }
+
+    public function ownerApprovedQuotation(): BelongsTo
+    {
+        return $this->belongsTo(Quotation::class, 'owner_approved_quotation_id');
     }
 
     public function workOrder(): HasOne

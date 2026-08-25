@@ -31,6 +31,7 @@ class ProviderInvoiceService
             'serviceRequest' => fn ($query) => $query->withoutGlobalScopes()->with('workOrder'),
         ])->findOrFail($quotation->getKey());
         $provider = ProviderCompany::findOrFail($quotation->provider_company_id);
+        $this->ensureActiveProvider($provider);
         if (! app(ProviderAccess::class)->hasRole($user, $provider, ProviderAccess::INVOICE_ROLES)) {
             abort(403);
         }
@@ -42,14 +43,20 @@ class ProviderInvoiceService
             throw ValidationException::withMessages(['work_order' => 'The work order must be completed before invoicing.']);
         }
 
+        $copyingQuotation = $lines === null;
         $lines ??= $quotation->lines->map(fn ($line) => [
             'quotation_line_id' => $line->getKey(), 'description' => $line->description,
             'quantity' => $line->quantity, 'unit_price' => $line->unit_price,
             'tax_amount' => $line->tax_amount, 'discount_amount' => $line->discount_amount,
         ])->all();
-        $calculation = $this->calculator->calculate($lines);
+        $deliveryAmount = $copyingQuotation
+            ? $quotation->delivery_amount
+            : ($attributes['delivery_amount'] ?? 0);
+        $calculation = $this->calculator->calculate($lines, $deliveryAmount);
 
         return DB::transaction(function () use ($quotation, $attributes, $calculation) {
+            $provider = ProviderCompany::lockForUpdate()->findOrFail($quotation->provider_company_id);
+            $this->ensureActiveProvider($provider);
             $request = $quotation->serviceRequest;
             $invoice = ProviderInvoice::withoutGlobalScopes()->firstOrNew(['service_request_id' => $request->getKey()]);
             if ($invoice->exists && $invoice->status !== ProviderInvoice::STATUS_DRAFT) {
@@ -57,7 +64,7 @@ class ProviderInvoiceService
             }
 
             $invoice->fill([
-                ...$attributes, ...collect($calculation)->except(['lines', 'delivery_amount'])->all(),
+                ...$attributes, ...collect($calculation)->except('lines')->all(),
                 'work_order_id' => $request->workOrder?->getKey(), 'quotation_id' => $quotation->getKey(),
                 'provider_company_id' => $quotation->provider_company_id, 'account_id' => $request->account_id,
                 'property_owner_id' => $request->property_owner_id, 'property_id' => $request->property_id,
@@ -81,26 +88,34 @@ class ProviderInvoiceService
     public function submit(ProviderInvoice $invoice, User $user): ProviderInvoice
     {
         $provider = ProviderCompany::findOrFail($invoice->provider_company_id);
+        $this->ensureActiveProvider($provider);
         if (! app(ProviderAccess::class)->hasRole($user, $provider, ProviderAccess::INVOICE_ROLES)) {
             abort(403);
         }
-        if ($invoice->status !== ProviderInvoice::STATUS_DRAFT || ! $invoice->lines()->exists()) {
-            throw ValidationException::withMessages(['invoice' => 'Only a complete draft invoice can be submitted.']);
-        }
-        $quoteTotal = Money::toMinor(Quotation::withoutGlobalScopes()->findOrFail($invoice->quotation_id)->total_amount);
-        if (Money::toMinor($invoice->total_amount) > $quoteTotal && blank($invoice->variation_reason)) {
-            throw ValidationException::withMessages(['variation_reason' => 'A reason is required when the invoice exceeds the accepted quotation.']);
-        }
 
-        $invoice->forceFill([
-            'status' => ProviderInvoice::STATUS_SUBMITTED, 'submitted_at' => now(), 'submitted_by' => $user->getKey(),
-        ])->save();
-        ServiceRequest::withoutGlobalScopes()->whereKey($invoice->service_request_id)->update(['status' => ServiceRequest::STATUS_INVOICED]);
-        $invoice->serviceRequest()->withoutGlobalScopes()->first()?->creator?->notify(new MarketplaceNotification([
-            'title' => 'Provider invoice submitted', 'provider_invoice_id' => $invoice->getKey(),
-        ]));
+        return DB::transaction(function () use ($invoice, $user) {
+            $provider = ProviderCompany::lockForUpdate()->findOrFail($invoice->provider_company_id);
+            $this->ensureActiveProvider($provider);
+            $invoice = ProviderInvoice::withoutGlobalScopes()->lockForUpdate()->findOrFail($invoice->getKey());
+            if ($invoice->status !== ProviderInvoice::STATUS_DRAFT || ! $invoice->lines()->exists()) {
+                throw ValidationException::withMessages(['invoice' => 'Only a complete draft invoice can be submitted.']);
+            }
+            $quoteTotal = Money::toMinor(Quotation::withoutGlobalScopes()->findOrFail($invoice->quotation_id)->total_amount);
+            if (Money::toMinor($invoice->total_amount) > $quoteTotal && blank($invoice->variation_reason)) {
+                throw ValidationException::withMessages(['variation_reason' => 'A reason is required when the invoice exceeds the accepted quotation.']);
+            }
 
-        return $invoice->refresh();
+            $invoice->forceFill([
+                'status' => ProviderInvoice::STATUS_SUBMITTED, 'submitted_at' => now(), 'submitted_by' => $user->getKey(),
+            ])->save();
+            $request = ServiceRequest::withoutGlobalScopes()->lockForUpdate()->findOrFail($invoice->service_request_id);
+            $request->forceFill(['status' => ServiceRequest::STATUS_INVOICED])->saveQuietly();
+            $request->creator?->notify(new MarketplaceNotification([
+                'title' => 'Provider invoice submitted', 'provider_invoice_id' => $invoice->getKey(),
+            ]));
+
+            return $invoice->refresh();
+        });
     }
 
     public function approve(ProviderInvoice $invoice, User $user, bool $approveVariation = false): ProviderInvoice
@@ -171,7 +186,10 @@ class ProviderInvoiceService
                 'source_type' => 'provider_invoice', 'source_id' => $invoice->getKey(), 'created_by' => $user->getKey(),
             ]);
 
-            if ($expense->owner_approval_required && $request->owner_approved_at) {
+            if ($expense->owner_approval_required
+                && (int) $request->owner_approved_quotation_id === (int) $invoice->quotation_id
+                && Money::toMinor($request->owner_approved_amount) === Money::toMinor($invoice->total_amount)
+                && $request->owner_approved_currency === $invoice->currency) {
                 $this->expenses->recordOwnerApproval($expense, $user, $request->owner_approval_reference ?: 'Recorded on service request');
             }
             $this->expenses->approve($expense, $user);
@@ -182,5 +200,12 @@ class ProviderInvoiceService
 
             return $invoice->fresh('propertyExpense');
         });
+    }
+
+    private function ensureActiveProvider(ProviderCompany $provider): void
+    {
+        if (! $provider->isActive()) {
+            throw ValidationException::withMessages(['provider' => 'Only active providers may manage provider invoices.']);
+        }
     }
 }

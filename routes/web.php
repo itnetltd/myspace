@@ -3,11 +3,19 @@
 use App\Http\Controllers\LeaseContractController;
 use App\Http\Controllers\MoveOutReportController;
 use App\Http\Controllers\OwnerStatementController;
+use App\Http\Controllers\ProviderStaffInvitationController;
 use App\Http\Controllers\RentStatementController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::get('/provider-staff-invitations/{token}', [ProviderStaffInvitationController::class, 'show'])
+        ->name('provider-staff-invitations.show');
+    Route::post('/provider-staff-invitations/{token}/accept', [ProviderStaffInvitationController::class, 'accept'])
+        ->name('provider-staff-invitations.accept');
 });
 
 // =========================

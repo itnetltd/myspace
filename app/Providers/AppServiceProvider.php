@@ -21,6 +21,7 @@ use App\Models\ProviderCompany;
 use App\Models\ProviderCompanyMembership;
 use App\Models\ProviderInvoice;
 use App\Models\ProviderService;
+use App\Models\ProviderStaffInvitation;
 use App\Models\Quotation;
 use App\Models\RentInvoice;
 use App\Models\RentPayment;
@@ -100,6 +101,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(ProviderCompany::class, ProviderCompanyPolicy::class);
         Gate::policy(ProviderCompanyMembership::class, ProviderOwnedPolicy::class);
         Gate::policy(ProviderService::class, ProviderOwnedPolicy::class);
+        Gate::policy(ProviderStaffInvitation::class, ProviderOwnedPolicy::class);
         Gate::policy(SupplierProduct::class, ProviderOwnedPolicy::class);
         Gate::policy(ServiceRequest::class, MarketplaceAccountPolicy::class);
         Gate::policy(Quotation::class, QuotationPolicy::class);

@@ -54,11 +54,12 @@ class CurrentProviderCompany
     {
         $company = $user->providerCompanies()
             ->wherePivot('is_active', true)
+            ->whereIn('provider_companies.status', [ProviderCompany::STATUS_PENDING, ProviderCompany::STATUS_ACTIVE])
             ->whereKey($companyId)
             ->first();
 
         if (! $company) {
-            throw new AuthorizationException('You do not belong to that provider company.');
+            throw new AuthorizationException('That provider workspace is unavailable or you do not belong to it.');
         }
 
         $user->forceFill(['current_provider_company_id' => $company->getKey()])->save();

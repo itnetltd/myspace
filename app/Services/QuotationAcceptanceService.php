@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Account;
 use App\Models\ProviderCompany;
+use App\Models\ProviderInvitation;
 use App\Models\Quotation;
 use App\Models\ServiceRequest;
 use App\Models\User;
@@ -31,15 +32,20 @@ class QuotationAcceptanceService
             abort(403);
         }
 
+        if ($quotation->status === Quotation::STATUS_SUBMITTED && $quotation->valid_until?->lt(today())) {
+            $quotation->forceFill(['status' => Quotation::STATUS_EXPIRED])->save();
+            throw ValidationException::withMessages(['quotation' => 'Expired quotations cannot be accepted.']);
+        }
+
         $requiresApproval = $this->requiresOwnerApproval($request, $quotation, $account);
-        if ($requiresApproval && ! $request->owner_approved_at) {
+        if ($requiresApproval && ! $this->hasMatchingOwnerApproval($request, $quotation)) {
             ServiceRequest::withoutGlobalScopes()->whereKey($request->getKey())->update(['owner_approval_required' => true]);
             throw ValidationException::withMessages([
-                'owner_approval' => 'Owner approval must be recorded before this quotation can be accepted.',
+                'owner_approval' => 'Owner approval for this exact quotation and amount must be recorded before acceptance.',
             ]);
         }
 
-        return DB::transaction(function () use ($quotation, $user, $requiresApproval) {
+        return DB::transaction(function () use ($quotation, $user, $account) {
             $request = ServiceRequest::withoutGlobalScopes()->lockForUpdate()->findOrFail($quotation->service_request_id);
             $quotation = Quotation::withoutGlobalScopes()->lockForUpdate()->findOrFail($quotation->getKey());
 
@@ -52,6 +58,18 @@ class QuotationAcceptanceService
             if ($quotation->status !== Quotation::STATUS_SUBMITTED) {
                 throw ValidationException::withMessages(['quotation' => 'Only a submitted quotation can be accepted.']);
             }
+            if (! in_array($request->status, [ServiceRequest::STATUS_REQUESTED, ServiceRequest::STATUS_QUOTES_RECEIVED], true)) {
+                throw ValidationException::withMessages(['service_request' => 'This service request can no longer accept a quotation.']);
+            }
+            if ($quotation->valid_until?->lt(today())) {
+                throw ValidationException::withMessages(['quotation' => 'Expired quotations cannot be accepted.']);
+            }
+            $requiresApproval = $this->requiresOwnerApproval($request, $quotation, $account);
+            if ($requiresApproval && ! $this->hasMatchingOwnerApproval($request, $quotation)) {
+                throw ValidationException::withMessages([
+                    'owner_approval' => 'Owner approval no longer matches this quotation and amount.',
+                ]);
+            }
 
             $quotation->forceFill([
                 'status' => Quotation::STATUS_ACCEPTED, 'accepted_at' => now(), 'accepted_by' => $user->getKey(),
@@ -60,6 +78,14 @@ class QuotationAcceptanceService
                 ->where('service_request_id', $request->getKey())->whereKeyNot($quotation->getKey())
                 ->where('status', Quotation::STATUS_SUBMITTED)
                 ->update(['status' => Quotation::STATUS_REJECTED, 'rejected_at' => now()]);
+            Quotation::withoutGlobalScopes()
+                ->where('service_request_id', $request->getKey())->whereKeyNot($quotation->getKey())
+                ->where('status', Quotation::STATUS_DRAFT)
+                ->update(['status' => Quotation::STATUS_WITHDRAWN]);
+            ProviderInvitation::where('service_request_id', $request->getKey())
+                ->where('provider_company_id', '!=', $quotation->provider_company_id)
+                ->whereNotIn('status', [ProviderInvitation::STATUS_DECLINED, ProviderInvitation::STATUS_EXPIRED])
+                ->update(['status' => ProviderInvitation::STATUS_NOT_SELECTED, 'responded_at' => now()]);
 
             Quotation::withoutGlobalScopes()->where('service_request_id', $request->getKey())
                 ->whereKeyNot($quotation->getKey())->where('status', Quotation::STATUS_REJECTED)
@@ -111,5 +137,13 @@ class QuotationAcceptanceService
 
         return $agreement?->maintenance_approval_limit === null
             || Money::toMinor($quotation->total_amount) > Money::toMinor($agreement->maintenance_approval_limit);
+    }
+
+    private function hasMatchingOwnerApproval(ServiceRequest $request, Quotation $quotation): bool
+    {
+        return $request->owner_approved_at !== null
+            && (int) $request->owner_approved_quotation_id === (int) $quotation->getKey()
+            && Money::toMinor($request->owner_approved_amount) === Money::toMinor($quotation->total_amount)
+            && $request->owner_approved_currency === $quotation->currency;
     }
 }

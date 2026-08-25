@@ -43,10 +43,18 @@ class Quotation extends Model
     protected static function booted(): void
     {
         static::updating(function (self $quotation) {
-            if (in_array($quotation->getOriginal('status'), [self::STATUS_ACCEPTED, self::STATUS_REJECTED], true)) {
-                $allowed = ['status', 'accepted_at', 'accepted_by', 'rejected_at', 'updated_at'];
-                if (array_diff(array_keys($quotation->getDirty()), $allowed) !== []) {
-                    throw ValidationException::withMessages(['quotation' => 'Accepted or rejected quotations are immutable.']);
+            if (array_intersect(array_keys($quotation->getDirty()), [
+                'service_request_id', 'provider_company_id', 'quotation_number', 'created_by',
+            ]) !== []) {
+                throw ValidationException::withMessages(['quotation' => 'A quotation cannot be moved or reassigned.']);
+            }
+
+            if ($quotation->getOriginal('status') !== self::STATUS_DRAFT) {
+                $workflowFields = [
+                    'status', 'accepted_at', 'accepted_by', 'rejected_at', 'updated_at',
+                ];
+                if (array_diff(array_keys($quotation->getDirty()), $workflowFields) !== []) {
+                    throw ValidationException::withMessages(['quotation' => 'Submitted quotation commercial details are immutable.']);
                 }
             }
         });

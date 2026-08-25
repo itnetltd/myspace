@@ -70,12 +70,6 @@ class ServiceRequestResource extends Resource
                     && in_array($record->status, [ServiceRequest::STATUS_DRAFT, ServiceRequest::STATUS_REQUESTED], true))
                 ->action(fn (ServiceRequest $record, array $data) => app(ServiceRequestService::class)
                     ->invite($record, $data['providers'], auth()->user(), $data['expires_at'] ?? null)),
-            Tables\Actions\Action::make('recordOwnerApproval')
-                ->form([Forms\Components\Textarea::make('reference')->required()])
-                ->visible(fn (ServiceRequest $record) => auth()->user()->can('update', $record)
-                    && $record->owner_approval_required && ! $record->owner_approved_at)
-                ->action(fn (ServiceRequest $record, array $data) => app(ServiceRequestService::class)
-                    ->recordOwnerApproval($record, auth()->user(), $data['reference'])),
         ]);
     }
 

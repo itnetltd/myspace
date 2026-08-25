@@ -30,6 +30,8 @@ class ProviderInvoiceResource extends Resource
                     ->pluck('quotation_number', 'id')),
             Forms\Components\DatePicker::make('invoice_date')->default(now())->required(),
             Forms\Components\DatePicker::make('due_date'),
+            Forms\Components\TextInput::make('delivery_amount')->numeric()->default(0)
+                ->helperText('Leave at zero with no custom lines to copy the accepted quotation delivery charge.'),
             Forms\Components\FileUpload::make('document_path')->directory('private/provider-invoices'),
             Forms\Components\Textarea::make('variation_reason')->helperText('Required if the invoice exceeds the accepted quotation.'),
             Forms\Components\Textarea::make('notes'),
