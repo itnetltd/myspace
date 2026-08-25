@@ -22,13 +22,16 @@ class ProviderInvoiceService
         private readonly MarketplaceNumberGenerator $numbers,
         private readonly QuotationCalculator $calculator,
         private readonly PropertyExpenseService $expenses,
+        private readonly WorkOrderActivityService $activities,
     ) {}
 
     public function saveDraft(Quotation $quotation, array $attributes, ?array $lines, User $user): ProviderInvoice
     {
         $quotation = Quotation::withoutGlobalScopes()->with([
             'lines',
-            'serviceRequest' => fn ($query) => $query->withoutGlobalScopes()->with('workOrder'),
+            'serviceRequest' => fn ($query) => $query->withoutGlobalScopes()->with([
+                'workOrder' => fn ($workOrder) => $workOrder->withoutGlobalScopes()->with('acceptedCompletionSubmission'),
+            ]),
         ])->findOrFail($quotation->getKey());
         $provider = ProviderCompany::findOrFail($quotation->provider_company_id);
         $this->ensureActiveProvider($provider);
@@ -39,8 +42,17 @@ class ProviderInvoiceService
             || (int) $quotation->serviceRequest->accepted_quotation_id !== (int) $quotation->getKey()) {
             throw ValidationException::withMessages(['quotation' => 'Only the selected provider can invoice an accepted quotation.']);
         }
-        if ($quotation->serviceRequest->workOrder?->status !== \App\Models\WorkOrder::STATUS_COMPLETED) {
+        $workOrder = $quotation->serviceRequest->workOrder;
+        if ($workOrder?->status !== \App\Models\WorkOrder::STATUS_COMPLETED) {
             throw ValidationException::withMessages(['work_order' => 'The work order must be completed before invoicing.']);
+        }
+        if ($workOrder->completion_review_required
+            && (! $workOrder->accepted_completion_submission_id
+                || $workOrder->acceptedCompletionSubmission?->status !== \App\Models\WorkOrderCompletionSubmission::STATUS_ACCEPTED
+                || (int) $workOrder->acceptedCompletionSubmission?->work_order_id !== (int) $workOrder->getKey())) {
+            throw ValidationException::withMessages([
+                'work_order' => 'Account acceptance of the completion submission is required before invoicing.',
+            ]);
         }
 
         $copyingQuotation = $lines === null;
@@ -113,6 +125,10 @@ class ProviderInvoiceService
             $request->creator?->notify(new MarketplaceNotification([
                 'title' => 'Provider invoice submitted', 'provider_invoice_id' => $invoice->getKey(),
             ]));
+            $workOrder = \App\Models\WorkOrder::withoutGlobalScopes()->findOrFail($invoice->work_order_id);
+            $this->activities->record($workOrder, 'invoice_submitted', 'Provider invoice submitted.', $user, [
+                'provider_invoice_id' => $invoice->getKey(),
+            ]);
 
             return $invoice->refresh();
         });

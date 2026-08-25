@@ -5,6 +5,7 @@ use App\Http\Controllers\MoveOutReportController;
 use App\Http\Controllers\OwnerStatementController;
 use App\Http\Controllers\ProviderStaffInvitationController;
 use App\Http\Controllers\RentStatementController;
+use App\Http\Controllers\WorkOrderEvidenceController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -17,6 +18,9 @@ Route::middleware('auth')->group(function () {
     Route::post('/provider-staff-invitations/{token}/accept', [ProviderStaffInvitationController::class, 'accept'])
         ->name('provider-staff-invitations.accept');
 });
+
+Route::get('/work-order-evidence/{evidence}', [WorkOrderEvidenceController::class, 'show'])
+    ->middleware('auth')->name('work-order-evidence.show');
 
 // =========================
 // REPORTS (PDF)

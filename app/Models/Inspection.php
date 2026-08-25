@@ -22,10 +22,13 @@ class Inspection extends Model
         'inspected_by',
         'general_notes',
         'summary_status',
+        'external_work_order_id',
+        'external_completed_at',
     ];
 
     protected $casts = [
         'inspected_on' => 'date',
+        'external_completed_at' => 'datetime',
     ];
 
     protected function accountParentMap(): array
@@ -54,6 +57,11 @@ class Inspection extends Model
     public function externalServiceRequest(): HasOne
     {
         return $this->hasOne(ServiceRequest::class);
+    }
+
+    public function externalWorkOrder(): BelongsTo
+    {
+        return $this->belongsTo(WorkOrder::class, 'external_work_order_id');
     }
 
     /**
