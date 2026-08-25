@@ -3,7 +3,9 @@
 namespace App\Filament\Provider\Resources;
 
 use App\Filament\Provider\Resources\ProviderInvitationResource\Pages;
+use App\Models\ProviderCompany;
 use App\Models\ProviderInvitation;
+use App\Models\ServiceRequest;
 use App\Support\CurrentProviderCompany;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -28,8 +30,24 @@ class ProviderInvitationResource extends Resource
             Tables\Columns\TextColumn::make('status')->badge(),
             Tables\Columns\TextColumn::make('expires_at')->dateTime(),
         ])->actions([
-            Tables\Actions\Action::make('quote')->url(fn (ProviderInvitation $record) => QuotationResource::getUrl('create', ['service_request_id' => $record->service_request_id])),
+            Tables\Actions\Action::make('quote')
+                ->visible(fn (ProviderInvitation $record) => static::canQuote($record))
+                ->url(fn (ProviderInvitation $record) => QuotationResource::getUrl('create', ['service_request_id' => $record->service_request_id])),
         ]);
+    }
+
+    public static function canQuote(ProviderInvitation $invitation): bool
+    {
+        $requestStatus = $invitation->relationLoaded('serviceRequest')
+            ? $invitation->serviceRequest?->status
+            : ServiceRequest::withoutGlobalScopes()->whereKey($invitation->service_request_id)->value('status');
+
+        return in_array($invitation->status, [ProviderInvitation::STATUS_INVITED, ProviderInvitation::STATUS_VIEWED], true)
+            && ($invitation->expires_at === null || ! $invitation->expires_at->isPast())
+            && in_array($requestStatus, [ServiceRequest::STATUS_REQUESTED, ServiceRequest::STATUS_QUOTES_RECEIVED], true)
+            && ProviderCompany::whereKey(app(CurrentProviderCompany::class)->id())
+                ->where('status', ProviderCompany::STATUS_ACTIVE)
+                ->exists();
     }
 
     public static function getEloquentQuery(): Builder

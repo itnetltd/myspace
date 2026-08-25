@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Provider\Resources\ProviderInvitationResource;
 use App\Models\Account;
 use App\Models\Inspection;
 use App\Models\Lease;
@@ -37,6 +38,54 @@ use Tests\TestCase;
 class MarketplaceIntegrityHardeningTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_quote_action_visibility_requires_an_open_invitation_request_and_active_provider(): void
+    {
+        [$owner, $account, $portfolio] = $this->workspace();
+        $provider = $this->provider('Quote Visibility Provider');
+        $request = $this->request($account, $portfolio, $owner);
+        app(ServiceRequestService::class)->invite($request, [$provider['company']->id], $owner);
+        $this->useProvider($provider['user'], $provider['company']);
+        $invitation = ProviderInvitation::where('service_request_id', $request->id)->firstOrFail();
+        $invitation->setRelation('serviceRequest', $request->fresh());
+
+        $this->assertTrue(ProviderInvitationResource::canQuote($invitation));
+        $invitation->forceFill(['status' => ProviderInvitation::STATUS_VIEWED]);
+        $this->assertTrue(ProviderInvitationResource::canQuote($invitation));
+
+        $invitation->forceFill(['expires_at' => now()->subSecond()]);
+        $this->assertFalse(ProviderInvitationResource::canQuote($invitation));
+        $invitation->forceFill(['expires_at' => null]);
+
+        foreach ([
+            ProviderInvitation::STATUS_NOT_SELECTED,
+            ProviderInvitation::STATUS_DECLINED,
+            ProviderInvitation::STATUS_EXPIRED,
+            ProviderInvitation::STATUS_QUOTED,
+        ] as $status) {
+            $invitation->forceFill(['status' => $status]);
+            $this->assertFalse(ProviderInvitationResource::canQuote($invitation));
+        }
+
+        $invitation->forceFill(['status' => ProviderInvitation::STATUS_INVITED]);
+        foreach ([
+            ServiceRequest::STATUS_QUOTE_ACCEPTED,
+            ServiceRequest::STATUS_IN_PROGRESS,
+            ServiceRequest::STATUS_COMPLETED,
+            ServiceRequest::STATUS_INVOICED,
+            ServiceRequest::STATUS_CLOSED,
+            ServiceRequest::STATUS_CANCELLED,
+        ] as $status) {
+            $request->forceFill(['status' => $status]);
+            $invitation->setRelation('serviceRequest', $request);
+            $this->assertFalse(ProviderInvitationResource::canQuote($invitation));
+        }
+
+        $request->forceFill(['status' => ServiceRequest::STATUS_REQUESTED]);
+        $invitation->setRelation('serviceRequest', $request);
+        $provider['company']->forceFill(['status' => ProviderCompany::STATUS_SUSPENDED])->save();
+        $this->assertFalse(ProviderInvitationResource::canQuote($invitation));
+    }
 
     public function test_late_quotes_are_blocked_after_acceptance_and_request_status_never_regresses(): void
     {

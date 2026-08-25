@@ -1,4 +1,5 @@
 *.log
+*.sqlite
 .DS_Store
 .env
 .env.backup
@@ -19,6 +20,7 @@
 /storage/*.key
 /storage/pail
 /vendor
+/myspaces
 Homestead.json
 Homestead.yaml
 Thumbs.db
