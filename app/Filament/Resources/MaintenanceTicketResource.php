@@ -184,6 +184,11 @@ class MaintenanceTicketResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('requestQuotations')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->url(fn (MaintenanceTicket $record) => ServiceRequestResource::getUrl('create', [
+                        'maintenance_ticket_id' => $record->getKey(),
+                    ])),
                 Tables\Actions\Action::make('createExpense')
                     ->label('Create Expense')
                     ->icon('heroicon-o-receipt-refund')

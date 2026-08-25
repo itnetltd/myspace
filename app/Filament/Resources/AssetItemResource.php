@@ -4,6 +4,9 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\AssetItemResource\Pages;
 use App\Models\AssetItem;
+use App\Models\AssetItemSupplierProduct;
+use App\Models\SupplierProduct;
+use App\Services\SupplierProductMatchingService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -13,7 +16,9 @@ use Filament\Tables\Table;
 class AssetItemResource extends Resource
 {
     protected static ?string $model = AssetItem::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-cube';
+
     protected static ?string $navigationGroup = 'MySpaces Estate';
 
     public static function form(Form $form): Form
@@ -92,6 +97,32 @@ class AssetItemResource extends Resource
             ->filters([])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('matchSupplierProduct')
+                    ->icon('heroicon-o-link')
+                    ->form([
+                        Forms\Components\Select::make('supplier_product_id')->label('Supplier product')->searchable()->required()
+                            ->options(fn () => SupplierProduct::withoutGlobalScopes()->where('is_active', true)
+                                ->with('providerCompany')->get()->mapWithKeys(fn ($product) => [
+                                    $product->id => $product->providerCompany->name.' — '.$product->name.' ('.$product->currency.' '.$product->unit_price.')',
+                                ])),
+                        Forms\Components\Select::make('match_type')->options(array_combine(
+                            AssetItemSupplierProduct::MATCH_TYPES,
+                            AssetItemSupplierProduct::MATCH_TYPES,
+                        ))->required(),
+                        Forms\Components\Textarea::make('notes'),
+                    ])
+                    ->action(fn (AssetItem $record, array $data) => app(SupplierProductMatchingService::class)->match(
+                        $record,
+                        SupplierProduct::withoutGlobalScopes()->findOrFail($data['supplier_product_id']),
+                        $data['match_type'],
+                        auth()->user(),
+                        $data['notes'] ?? null,
+                    )),
+                Tables\Actions\Action::make('requestSupplierQuotations')
+                    ->icon('heroicon-o-shopping-cart')
+                    ->url(fn (AssetItem $record) => ServiceRequestResource::getUrl('create', [
+                        'asset_item_id' => $record->getKey(),
+                    ])),
             ])
             ->bulkActions([
                 Tables\Actions\DeleteBulkAction::make(),

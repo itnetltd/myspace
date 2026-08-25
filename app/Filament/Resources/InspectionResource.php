@@ -6,28 +6,26 @@ use App\Filament\Resources\InspectionResource\Pages;
 use App\Models\Inspection;
 use App\Models\UnitAsset;
 use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
-
-// Form button imports
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
-
-// For conditional visibility in forms
+use Filament\Forms\Form;
 use Filament\Forms\Get;
-
-// Table action alias
+// Form button imports
+use Filament\Resources\Resource;
+use Filament\Tables;
+// For conditional visibility in forms
 use Filament\Tables\Actions\Action as TableAction;
-
-// ✅ Filters
+// Table action alias
 use Filament\Tables\Filters\SelectFilter;
+// ✅ Filters
+use Filament\Tables\Table;
 
 class InspectionResource extends Resource
 {
     protected static ?string $model = Inspection::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
+
     protected static ?string $navigationGroup = 'MySpaces Estate';
 
     public static function form(Form $form): Form
@@ -39,7 +37,7 @@ class InspectionResource extends Resource
             'maintenance' => 'Maintenance',
         ];
 
-        $conditions = ['Excellent','Good','Fair','Damaged','Missing'];
+        $conditions = ['Excellent', 'Good', 'Fair', 'Damaged', 'Missing'];
         $issueTypes = ['none' => 'None', 'damaged' => 'Damaged', 'missing' => 'Missing', 'other' => 'Other'];
 
         return $form->schema([
@@ -59,6 +57,7 @@ class InspectionResource extends Resource
 
                             if (! $state) {
                                 $set('lines', []);
+
                                 return;
                             }
 
@@ -71,18 +70,18 @@ class InspectionResource extends Resource
                                 $expected = (int) $ua->quantity;
 
                                 return [
-                                    'asset_item_id'        => $ua->asset_item_id,
-                                    'expected_qty'         => $expected,
-                                    'found_qty'            => $expected,
-                                    'condition_status'     => $ua->condition_status ?? 'Good',
-                                    'issue_type'           => 'none',
+                                    'asset_item_id' => $ua->asset_item_id,
+                                    'expected_qty' => $expected,
+                                    'found_qty' => $expected,
+                                    'condition_status' => $ua->condition_status ?? 'Good',
+                                    'issue_type' => 'none',
 
                                     // Manual override fields
-                                    'deduction_override'   => null,
-                                    'deduction_reason'     => null,
+                                    'deduction_override' => null,
+                                    'deduction_reason' => null,
 
-                                    'remarks'              => null,
-                                    'evidence_photo_path'  => null,
+                                    'remarks' => null,
+                                    'evidence_photo_path' => null,
                                 ];
                             })->values()->all();
 
@@ -98,9 +97,9 @@ class InspectionResource extends Resource
                         ->relationship('lease', 'id')
                         ->getOptionLabelFromRecordUsing(function ($record) {
                             $tenant = (string) ($record->tenant_name ?? '');
-                            $unit   = (string) ($record->unit?->unit_code ?? '');
+                            $unit = (string) ($record->unit?->unit_code ?? '');
 
-                            $label = trim($tenant) !== '' ? $tenant : ('Lease #' . $record->id);
+                            $label = trim($tenant) !== '' ? $tenant : ('Lease #'.$record->id);
 
                             return $unit !== '' ? "{$label} ({$unit})" : $label;
                         })
@@ -140,18 +139,18 @@ class InspectionResource extends Resource
                                     $expected = (int) $ua->quantity;
 
                                     return [
-                                        'asset_item_id'        => $ua->asset_item_id,
-                                        'expected_qty'         => $expected,
-                                        'found_qty'            => $expected,
-                                        'condition_status'     => $ua->condition_status ?? 'Good',
-                                        'issue_type'           => 'none',
+                                        'asset_item_id' => $ua->asset_item_id,
+                                        'expected_qty' => $expected,
+                                        'found_qty' => $expected,
+                                        'condition_status' => $ua->condition_status ?? 'Good',
+                                        'issue_type' => 'none',
 
                                         // Manual override fields
-                                        'deduction_override'   => null,
-                                        'deduction_reason'     => null,
+                                        'deduction_override' => null,
+                                        'deduction_reason' => null,
 
-                                        'remarks'              => null,
-                                        'evidence_photo_path'  => null,
+                                        'remarks' => null,
+                                        'evidence_photo_path' => null,
                                     ];
                                 })->values()->all();
 
@@ -182,7 +181,7 @@ class InspectionResource extends Resource
                                 ->live()
                                 ->afterStateUpdated(function ($state, callable $set, callable $get) {
                                     $expected = (int) ($get('expected_qty') ?? 0);
-                                    $found    = (int) ($state ?? 0);
+                                    $found = (int) ($state ?? 0);
 
                                     if ($found < $expected) {
                                         $set('issue_type', 'missing');
@@ -192,7 +191,7 @@ class InspectionResource extends Resource
                                 })
                                 ->helperText(function (callable $get) {
                                     $expected = (int) ($get('expected_qty') ?? 0);
-                                    $found    = (int) ($get('found_qty') ?? 0);
+                                    $found = (int) ($get('found_qty') ?? 0);
 
                                     if ($found < $expected) {
                                         return "Mismatch: expected {$expected}, found {$found}.";
@@ -242,47 +241,47 @@ class InspectionResource extends Resource
     public static function table(Table $table): Table
     {
         return $table->columns([
-                Tables\Columns\TextColumn::make('unit.unit_code')->label('Unit')->sortable()->searchable(),
+            Tables\Columns\TextColumn::make('unit.unit_code')->label('Unit')->sortable()->searchable(),
 
-                // Better label instead of move_in/move_out
-                Tables\Columns\TextColumn::make('type')
-                    ->label('Type')
-                    ->badge()
-                    ->formatStateUsing(fn ($state) => match ($state) {
-                        'move_in' => 'Move-in',
-                        'move_out' => 'Move-out',
-                        'routine' => 'Routine',
-                        'maintenance' => 'Maintenance',
-                        default => $state,
-                    })
-                    ->sortable(),
+            // Better label instead of move_in/move_out
+            Tables\Columns\TextColumn::make('type')
+                ->label('Type')
+                ->badge()
+                ->formatStateUsing(fn ($state) => match ($state) {
+                    'move_in' => 'Move-in',
+                    'move_out' => 'Move-out',
+                    'routine' => 'Routine',
+                    'maintenance' => 'Maintenance',
+                    default => $state,
+                })
+                ->sortable(),
 
-                // Issues count badge (missing/damaged)
-                Tables\Columns\TextColumn::make('issues_count')
-                    ->label('Issues')
-                    ->badge()
-                    ->getStateUsing(function (Inspection $record) {
-                        $record->loadMissing('lines');
+            // Issues count badge (missing/damaged)
+            Tables\Columns\TextColumn::make('issues_count')
+                ->label('Issues')
+                ->badge()
+                ->getStateUsing(function (Inspection $record) {
+                    $record->loadMissing('lines');
 
-                        return $record->lines->filter(function ($l) {
-                            $expected = (int) ($l->expected_qty ?? 0);
-                            $found = (int) ($l->found_qty ?? 0);
+                    return $record->lines->filter(function ($l) {
+                        $expected = (int) ($l->expected_qty ?? 0);
+                        $found = (int) ($l->found_qty ?? 0);
 
-                            return ($found < $expected)
-                                || (($l->issue_type ?? '') === 'damaged')
-                                || (($l->condition_status ?? '') === 'Damaged');
-                        })->count();
-                    }),
+                        return ($found < $expected)
+                            || (($l->issue_type ?? '') === 'damaged')
+                            || (($l->condition_status ?? '') === 'Damaged');
+                    })->count();
+                }),
 
-                Tables\Columns\TextColumn::make('inspected_on')->date()->sortable(),
-                Tables\Columns\TextColumn::make('inspected_by')->toggleable(),
+            Tables\Columns\TextColumn::make('inspected_on')->date()->sortable(),
+            Tables\Columns\TextColumn::make('inspected_by')->toggleable(),
 
-                Tables\Columns\TextColumn::make('lease_id')
-                    ->label('Lease')
-                    ->toggleable(isToggledHiddenByDefault: true),
+            Tables\Columns\TextColumn::make('lease_id')
+                ->label('Lease')
+                ->toggleable(isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('created_at')->dateTime()->toggleable(isToggledHiddenByDefault: true),
-            ])
+            Tables\Columns\TextColumn::make('created_at')->dateTime()->toggleable(isToggledHiddenByDefault: true),
+        ])
             // ✅ Filters (Lease + Unit) - FIXED lease label
             ->filters([
                 SelectFilter::make('lease_id')
@@ -290,9 +289,9 @@ class InspectionResource extends Resource
                     ->relationship('lease', 'id')
                     ->getOptionLabelFromRecordUsing(function ($record) {
                         $tenant = (string) ($record->tenant_name ?? '');
-                        $unit   = (string) ($record->unit?->unit_code ?? '');
+                        $unit = (string) ($record->unit?->unit_code ?? '');
 
-                        $label = trim($tenant) !== '' ? $tenant : ('Lease #' . $record->id);
+                        $label = trim($tenant) !== '' ? $tenant : ('Lease #'.$record->id);
 
                         return $unit !== '' ? "{$label} ({$unit})" : $label;
                     })
@@ -307,6 +306,11 @@ class InspectionResource extends Resource
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('requestExternalInspection')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->url(fn (Inspection $record) => ServiceRequestResource::getUrl('create', [
+                        'inspection_id' => $record->getKey(),
+                    ])),
 
                 // Move-Out PDF button (safe if route exists)
                 TableAction::make('moveOutPdf')
@@ -314,8 +318,7 @@ class InspectionResource extends Resource
                     ->icon('heroicon-o-arrow-down-tray')
                     ->url(fn (Inspection $record) => route('reports.moveout', $record))
                     ->openUrlInNewTab()
-                    ->visible(fn (Inspection $record) =>
-                        $record->type === 'move_out' && \Illuminate\Support\Facades\Route::has('reports.moveout')
+                    ->visible(fn (Inspection $record) => $record->type === 'move_out' && \Illuminate\Support\Facades\Route::has('reports.moveout')
                     ),
             ])
             ->bulkActions([

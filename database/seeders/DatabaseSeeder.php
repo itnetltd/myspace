@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             PhaseTwoDemoSeeder::class,
             RentPolicySeeder::class,
             DeductionPolicySeeder::class,
+            ProviderMarketplaceSeeder::class,
         ]);
     }
 }
