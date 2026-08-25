@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Account;
 use App\Models\Lease;
 use App\Models\MaintenanceTicket;
+use App\Models\ManagementAgreement;
 use App\Models\OwnerDisbursement;
 use App\Models\OwnerLedgerEntry;
 use App\Models\OwnerStatement;
@@ -405,6 +406,96 @@ class FinancialIntegrityHardeningTest extends TestCase
         $this->assertTrue(Gate::allows('update', $agreement));
     }
 
+    public function test_new_income_makes_a_draft_stale_and_regeneration_restores_statement_continuity(): void
+    {
+        [$user, $account, $portfolio] = $this->workspace();
+        $this->useAccount($user, $account);
+        $service = app(OwnerStatementService::class);
+
+        $this->adjust($portfolio['owner'], $user, '1000000.00', '2026-08-10');
+        $draft = $service->generateDraft($portfolio['owner'], '2026-08', $user);
+        $this->assertSame('1000000.00', $draft->closing_balance);
+
+        $this->adjust($portfolio['owner'], $user, '500000.00', '2026-08-20');
+        $this->assertDraftIsStale(fn () => $service->finalize($draft, $user));
+        $this->assertSame(OwnerStatement::STATUS_DRAFT, $draft->fresh()->status);
+
+        $regenerated = $service->generateDraft($portfolio['owner'], '2026-08', $user);
+        $this->assertSame('1500000.00', $regenerated->closing_balance);
+        $finalized = $service->finalize($regenerated, $user);
+        $september = $service->generateDraft($portfolio['owner'], '2026-09', $user);
+
+        $this->assertSame('1500000.00', $finalized->closing_balance);
+        $this->assertSame($finalized->closing_balance, $september->opening_balance);
+    }
+
+    public function test_new_expense_makes_an_existing_draft_stale(): void
+    {
+        [$user, $account, $portfolio] = $this->workspace();
+        $this->useAccount($user, $account);
+        $service = app(OwnerStatementService::class);
+        $draft = $service->generateDraft($portfolio['owner'], '2026-08', $user);
+
+        $expense = $this->expense($portfolio, '2026-08-15');
+        $expenses = app(PropertyExpenseService::class);
+        $expenses->approve($expense, $user);
+        $expenses->post($expense, $user);
+
+        $this->assertDraftIsStale(fn () => $service->finalize($draft, $user));
+    }
+
+    public function test_new_rent_makes_a_company_draft_and_its_management_fee_stale(): void
+    {
+        [$user, $account, $portfolio] = $this->workspace(Account::TYPE_PROPERTY_MANAGEMENT_COMPANY);
+        $this->useAccount($user, $account);
+        ManagementAgreement::create([
+            'property_owner_id' => $portfolio['owner']->id,
+            'property_id' => $portfolio['property']->id,
+            'reference_number' => 'AGR-FRESHNESS',
+            'start_date' => '2026-01-01',
+            'management_fee_type' => ManagementAgreement::FEE_PERCENTAGE,
+            'management_fee_percentage' => '10.0000',
+            'management_fee_fixed_amount' => '0.00',
+            'status' => ManagementAgreement::STATUS_ACTIVE,
+        ]);
+        $invoice = $this->invoice($portfolio, '2026-08-31');
+        $payments = app(RentPaymentService::class);
+        $payments->create([
+            'rent_invoice_id' => $invoice->id,
+            'paid_on' => '2026-08-10',
+            'amount' => '100000.00',
+        ]);
+        $service = app(OwnerStatementService::class);
+        $draft = $service->generateDraft($portfolio['owner'], '2026-08', $user);
+        $this->assertSame('10000.00', $draft->management_fees);
+
+        $payments->create([
+            'rent_invoice_id' => $invoice->id,
+            'paid_on' => '2026-08-20',
+            'amount' => '100000.00',
+        ]);
+
+        $this->assertDraftIsStale(fn () => $service->finalize($draft, $user));
+        $regenerated = $service->generateDraft($portfolio['owner'], '2026-08', $user);
+
+        $this->assertSame('20000.00', $regenerated->management_fees);
+    }
+
+    public function test_unchanged_draft_finalizes_and_locks_its_entries(): void
+    {
+        [$user, $account, $portfolio] = $this->workspace();
+        $this->useAccount($user, $account);
+        $this->adjust($portfolio['owner'], $user, '1000.00', '2026-08-10');
+        $service = app(OwnerStatementService::class);
+        $draft = $service->generateDraft($portfolio['owner'], '2026-08', $user);
+
+        $finalized = $service->finalize($draft, $user);
+
+        $this->assertSame(OwnerStatement::STATUS_FINALIZED, $finalized->status);
+        $this->assertNotNull($finalized->finalized_at);
+        $this->assertSame(1, OwnerLedgerEntry::where('owner_statement_id', $finalized->id)->whereNotNull('locked_at')->count());
+    }
+
     private function workspace(string $type = Account::TYPE_INDIVIDUAL_LANDLORD): array
     {
         $user = User::factory()->create();
@@ -503,5 +594,18 @@ class FinancialIntegrityHardeningTest extends TestCase
             'category' => 'repair', 'description' => 'Backdated repair',
             'amount' => '100.00', 'occurred_on' => $date,
         ]);
+    }
+
+    private function assertDraftIsStale(callable $callback): void
+    {
+        try {
+            $callback();
+            $this->fail('Expected stale owner statement finalization to be rejected.');
+        } catch (ValidationException $exception) {
+            $this->assertSame(
+                'This statement has new or changed financial activity. Regenerate the draft before finalizing.',
+                $exception->errors()['statement'][0] ?? null,
+            );
+        }
     }
 }

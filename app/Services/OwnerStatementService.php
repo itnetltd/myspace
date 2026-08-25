@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\OwnerLedgerEntry;
 use App\Models\OwnerStatement;
+use App\Models\OwnerStatementLine;
 use App\Models\PropertyOwner;
 use App\Models\User;
 use App\Support\Money;
@@ -142,6 +143,33 @@ class OwnerStatementService
                 return $statement;
             }
 
+            $owner = PropertyOwner::withoutGlobalScopes()->findOrFail($statement->property_owner_id);
+            $start = Carbon::parse($statement->period_start)->startOfDay();
+            $end = Carbon::parse($statement->period_end)->endOfDay();
+
+            // This may update or create the current fee entry. If that makes the
+            // draft stale, the exception below rolls the synchronization back so
+            // finalization never silently changes the statement being reviewed.
+            $this->managementFees->synchronize($owner, $start, $end);
+
+            $entries = OwnerLedgerEntry::withoutGlobalScopes()
+                ->where('account_id', $statement->account_id)
+                ->where('property_owner_id', $statement->property_owner_id)
+                ->whereDate('occurred_on', '>=', $start->toDateString())
+                ->whereDate('occurred_on', '<=', $end->toDateString())
+                ->orderBy('occurred_on')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            $lines = OwnerStatementLine::query()
+                ->where('owner_statement_id', $statement->getKey())
+                ->orderBy('occurred_on')
+                ->orderBy('id')
+                ->get();
+
+            $this->ensureDraftIsFresh($statement, $owner, $entries, $lines, $start);
+
             $statement->forceFill([
                 'status' => OwnerStatement::STATUS_FINALIZED,
                 'finalized_at' => now(),
@@ -149,11 +177,96 @@ class OwnerStatementService
             ])->save();
 
             OwnerLedgerEntry::withoutGlobalScopes()
-                ->where('owner_statement_id', $statement->getKey())
+                ->whereKey($entries->modelKeys())
                 ->update(['locked_at' => now()]);
 
             return $statement->fresh(['lines', 'propertyOwner']);
         });
+    }
+
+    private function ensureDraftIsFresh(
+        OwnerStatement $statement,
+        PropertyOwner $owner,
+        $entries,
+        $lines,
+        Carbon $start,
+    ): void {
+        if ($entries->contains(fn (OwnerLedgerEntry $entry) => (int) $entry->owner_statement_id !== (int) $statement->getKey())
+            || $entries->count() !== $lines->count()) {
+            $this->throwStaleDraft();
+        }
+
+        $linesByEntryNumber = $lines->keyBy(fn (OwnerStatementLine $line) => data_get($line->metadata, 'entry_number'));
+
+        if ($linesByEntryNumber->count() !== $lines->count()) {
+            $this->throwStaleDraft();
+        }
+
+        foreach ($entries as $entry) {
+            $line = $linesByEntryNumber->get($entry->entry_number);
+
+            if (! $line || ! $this->lineMatchesEntry($line, $entry)) {
+                $this->throwStaleDraft();
+            }
+        }
+
+        $openingMinor = Money::toMinor($this->balances->balance($owner, null, null, $start->copy()->subDay()));
+        $totals = $this->totals($entries);
+        $netMinor = $totals['credits'] - $totals['debits'];
+        $expected = [
+            'opening_balance' => $openingMinor,
+            'rent_collected' => $totals['rent'],
+            'late_fees_collected' => $totals['late'],
+            'other_income' => $totals['other_income'],
+            'expenses' => $totals['expenses'],
+            'management_fees' => $totals['management_fees'],
+            'owner_disbursements' => $totals['disbursements'],
+            'net_activity' => $netMinor,
+            'closing_balance' => $openingMinor + $netMinor,
+        ];
+
+        foreach ($expected as $attribute => $minor) {
+            if (Money::toMinor($statement->{$attribute}) !== $minor) {
+                $this->throwStaleDraft();
+            }
+        }
+    }
+
+    private function lineMatchesEntry(OwnerStatementLine $line, OwnerLedgerEntry $entry): bool
+    {
+        $creditMinor = $entry->direction === OwnerLedgerEntry::DIRECTION_CREDIT
+            ? Money::toMinor($entry->amount)
+            : 0;
+        $debitMinor = $entry->direction === OwnerLedgerEntry::DIRECTION_DEBIT
+            ? Money::toMinor($entry->amount)
+            : 0;
+
+        return $this->sameNullableId($line->property_id, $entry->property_id)
+            && $this->sameNullableId($line->unit_id, $entry->unit_id)
+            && $line->line_type === $entry->entry_type
+            && $line->description === $entry->description
+            && Money::toMinor($line->credit) === $creditMinor
+            && Money::toMinor($line->debit) === $debitMinor
+            && $line->occurred_on->toDateString() === $entry->occurred_on->toDateString()
+            && $line->source_type === $entry->source_type
+            && $this->sameNullableId($line->source_id, $entry->source_id)
+            && data_get($line->metadata, 'source_key') === $entry->source_key;
+    }
+
+    private function sameNullableId(mixed $left, mixed $right): bool
+    {
+        if ($left === null || $right === null) {
+            return $left === null && $right === null;
+        }
+
+        return (int) $left === (int) $right;
+    }
+
+    private function throwStaleDraft(): never
+    {
+        throw ValidationException::withMessages([
+            'statement' => 'This statement has new or changed financial activity. Regenerate the draft before finalizing.',
+        ]);
     }
 
     private function totals($entries): array
