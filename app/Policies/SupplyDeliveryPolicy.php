@@ -10,13 +10,15 @@ use App\Support\ProviderAccess;
 
 class SupplyDeliveryPolicy
 {
-    private const DELIVERY_ROLES = ['owner', 'administrator', 'sales', 'technician'];
+    private const VIEW_ROLES = ['owner', 'administrator', 'sales', 'technician', 'viewer'];
+
+    private const OPERATE_ROLES = ['owner', 'administrator', 'sales', 'technician'];
 
     public function viewAny(User $user): bool
     {
         $company = app(CurrentProviderCompany::class)->forUser($user);
 
-        return $company && app(ProviderAccess::class)->hasRole($user, $company, self::DELIVERY_ROLES);
+        return $company && app(ProviderAccess::class)->hasRole($user, $company, self::VIEW_ROLES);
     }
 
     public function view(User $user, SupplyDelivery $delivery): bool
@@ -28,7 +30,9 @@ class SupplyDeliveryPolicy
 
     public function create(User $user): bool
     {
-        return $this->viewAny($user);
+        $company = app(CurrentProviderCompany::class)->forUser($user);
+
+        return $company && app(ProviderAccess::class)->hasRole($user, $company, self::OPERATE_ROLES);
     }
 
     public function update(User $user, SupplyDelivery $delivery): bool

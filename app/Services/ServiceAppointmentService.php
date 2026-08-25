@@ -129,7 +129,11 @@ class ServiceAppointmentService
                 'cancelled_by' => $user->getKey(), 'cancelled_at' => now(), 'reschedule_notes' => $notes,
             ])->save();
             if ($workOrder->status === WorkOrder::STATUS_SCHEDULED) {
-                $workOrder->forceFill(['status' => WorkOrder::STATUS_PENDING])->save();
+                $workOrder->forceFill([
+                    'status' => WorkOrder::STATUS_PENDING,
+                    'scheduled_start' => null,
+                    'scheduled_completion' => null,
+                ])->save();
             }
             $this->activities->record($workOrder, 'appointment_reschedule_requested', 'The Account requested an appointment change.', $user, [
                 'appointment_id' => $appointment->getKey(), 'notes' => $notes,

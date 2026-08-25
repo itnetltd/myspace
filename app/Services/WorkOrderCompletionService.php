@@ -7,6 +7,7 @@ use App\Models\MaintenanceTicket;
 use App\Models\ProviderCompany;
 use App\Models\ServiceAppointment;
 use App\Models\ServiceRequest;
+use App\Models\SupplyDelivery;
 use App\Models\User;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderAssignment;
@@ -43,6 +44,18 @@ class WorkOrderCompletionService
             }
 
             $request = ServiceRequest::withoutGlobalScopes()->findOrFail($workOrder->service_request_id);
+            if ($request->request_type === ServiceRequest::TYPE_PRODUCT_SUPPLY
+                && SupplyDelivery::withoutGlobalScopes()
+                    ->where('work_order_id', $workOrder->getKey())
+                    ->whereIn('status', [
+                        SupplyDelivery::STATUS_PREPARING,
+                        SupplyDelivery::STATUS_READY,
+                        SupplyDelivery::STATUS_DISPATCHED,
+                    ])->exists()) {
+                throw ValidationException::withMessages([
+                    'delivery' => 'Finish or cancel every existing delivery before submitting completion.',
+                ]);
+            }
             $this->validateEvidenceTypes($request->request_type, $evidence);
             $submissionNumber = ((int) WorkOrderCompletionSubmission::where('work_order_id', $workOrder->getKey())
                 ->max('submission_number')) + 1;
@@ -76,6 +89,7 @@ class WorkOrderCompletionService
             $submission = WorkOrderCompletionSubmission::lockForUpdate()->findOrFail($submission->getKey());
             $this->access->authorizeAccount($user, $workOrder, AccountAccess::REVIEW_MARKETPLACE_COMPLETION);
             $this->assertReviewable($workOrder, $submission);
+            $recipients = $this->providerReviewRecipients($workOrder);
 
             $submission->forceFill([
                 'status' => WorkOrderCompletionSubmission::STATUS_ACCEPTED,
@@ -97,7 +111,7 @@ class WorkOrderCompletionService
             $this->activities->record($workOrder, 'completion_accepted', 'The Account accepted provider completion.', $user, [
                 'submission_id' => $submission->getKey(),
             ]);
-            $this->notifyProvider($workOrder, 'Completion accepted');
+            $this->notifyProviderReviewRecipients($recipients, $workOrder, 'Completion accepted');
 
             return $workOrder->refresh();
         });
@@ -115,6 +129,7 @@ class WorkOrderCompletionService
             $submission = WorkOrderCompletionSubmission::lockForUpdate()->findOrFail($submission->getKey());
             $this->access->authorizeAccount($user, $workOrder, AccountAccess::REVIEW_MARKETPLACE_COMPLETION);
             $this->assertReviewable($workOrder, $submission);
+            $recipients = $this->providerReviewRecipients($workOrder);
             $submission->forceFill([
                 'status' => WorkOrderCompletionSubmission::STATUS_REVISION_REQUESTED,
                 'reviewed_by' => $user->getKey(), 'reviewed_at' => now(), 'review_notes' => $reason,
@@ -123,7 +138,7 @@ class WorkOrderCompletionService
             $this->activities->record($workOrder, 'completion_revision_requested', 'The Account requested completion corrections.', $user, [
                 'submission_id' => $submission->getKey(), 'review_notes' => $reason,
             ]);
-            $this->notifyProvider($workOrder, 'Completion revision requested');
+            $this->notifyProviderReviewRecipients($recipients, $workOrder, 'Completion revision requested');
 
             return $workOrder->refresh();
         });
@@ -169,10 +184,26 @@ class WorkOrderCompletionService
         }
     }
 
-    private function notifyProvider(WorkOrder $workOrder, string $title): void
+    private function providerReviewRecipients(WorkOrder $workOrder): \Illuminate\Support\Collection
     {
-        ProviderCompany::find($workOrder->provider_company_id)?->users()->wherePivot('is_active', true)->get()
+        $managers = ProviderCompany::find($workOrder->provider_company_id)?->users()
+            ->wherePivot('is_active', true)->get()
             ->filter(fn ($user) => in_array($user->pivot->role, ['owner', 'administrator'], true))
-            ->each->notify(new MarketplaceNotification(['title' => $title, 'work_order_id' => $workOrder->getKey()]));
+            ?? collect();
+        $assigned = WorkOrderAssignment::withoutGlobalScopes()
+            ->where('work_order_id', $workOrder->getKey())
+            ->whereIn('status', WorkOrderAssignment::ACTIVE_STATUSES)
+            ->with(['membership' => fn ($membership) => $membership->withoutGlobalScopes()->with('user')])->get()
+            ->filter(fn ($assignment) => $assignment->membership?->is_active)
+            ->pluck('membership.user')->filter();
+
+        return $managers->concat($assigned)->unique('id')->values();
+    }
+
+    private function notifyProviderReviewRecipients(\Illuminate\Support\Collection $recipients, WorkOrder $workOrder, string $title): void
+    {
+        $recipients->each->notify(new MarketplaceNotification([
+            'title' => $title, 'work_order_id' => $workOrder->getKey(),
+        ]));
     }
 }

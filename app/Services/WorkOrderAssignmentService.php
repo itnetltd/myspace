@@ -30,6 +30,16 @@ class WorkOrderAssignmentService
             $this->access->authorizeProviderManager($user, $workOrder);
             $request = ServiceRequest::withoutGlobalScopes()->findOrFail($workOrder->service_request_id);
 
+            if (in_array($workOrder->status, [
+                WorkOrder::STATUS_COMPLETION_SUBMITTED,
+                WorkOrder::STATUS_COMPLETED,
+                WorkOrder::STATUS_CANCELLED,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    'work_order' => 'Staff cannot be assigned after work enters completion review or a terminal state.',
+                ]);
+            }
+
             if ((int) $membership->provider_company_id !== (int) $workOrder->provider_company_id) {
                 throw ValidationException::withMessages(['membership' => 'The assignee belongs to another provider company.']);
             }
@@ -41,6 +51,11 @@ class WorkOrderAssignmentService
             }
             if (! in_array($type, WorkOrderAssignment::TYPES, true)) {
                 throw ValidationException::withMessages(['assignment_type' => 'Unsupported assignment type.']);
+            }
+            if (! in_array($type, $this->assignmentTypes($request->request_type), true)) {
+                throw ValidationException::withMessages([
+                    'assignment_type' => 'This assignment type is not meaningful for the request type.',
+                ]);
             }
             if (WorkOrderAssignment::withoutGlobalScopes()->where('work_order_id', $workOrder->getKey())
                 ->where('provider_company_membership_id', $membership->getKey())
@@ -68,5 +83,18 @@ class WorkOrderAssignmentService
 
             return $assignment->fresh(['membership.user', 'workOrder']);
         });
+    }
+
+    /**
+     * Semantic assignment matrix, independent from provider membership roles.
+     */
+    private function assignmentTypes(string $requestType): array
+    {
+        return match ($requestType) {
+            ServiceRequest::TYPE_MAINTENANCE => ['technician', 'coordinator'],
+            ServiceRequest::TYPE_INSPECTION => ['inspector', 'coordinator'],
+            ServiceRequest::TYPE_PRODUCT_SUPPLY => ['delivery', 'coordinator', 'technician'],
+            default => [],
+        };
     }
 }

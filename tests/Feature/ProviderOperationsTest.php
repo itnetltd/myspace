@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Provider\Resources\SupplyDeliveryResource;
 use App\Models\Account;
 use App\Models\Inspection;
 use App\Models\MaintenanceTicket;
@@ -96,6 +97,9 @@ class ProviderOperationsTest extends TestCase
         $manager = $this->accountMember($context['account'], Account::ROLE_PROPERTY_MANAGER);
         $oldId = $confirmed->id;
         app(ServiceAppointmentService::class)->requestReschedule($confirmed, $manager, 'Please use the afternoon.');
+        $reschedulingWork = $context['work']->fresh();
+        $this->assertNull($reschedulingWork->scheduled_start);
+        $this->assertNull($reschedulingWork->scheduled_completion);
         $replacement = app(ServiceAppointmentService::class)->propose($context['work']->fresh(), [
             'scheduled_start' => now()->addDays(2), 'scheduled_end' => now()->addDays(2)->addHour(),
         ], $context['providerOwner']);
@@ -104,6 +108,39 @@ class ProviderOperationsTest extends TestCase
 
         $viewer = $this->accountMember($context['account'], Account::ROLE_VIEWER);
         $this->expectAuthorization(fn () => app(ServiceAppointmentService::class)->confirm($replacement, $viewer));
+        $replacement = app(ServiceAppointmentService::class)->confirm($replacement, $manager);
+        $this->assertEquals($replacement->scheduled_start, $context['work']->fresh()->scheduled_start);
+        $this->assertEquals($replacement->scheduled_end, $context['work']->fresh()->scheduled_completion);
+    }
+
+    public function test_delivery_resource_is_assignment_scoped_for_operational_staff(): void
+    {
+        $context = $this->operation(ServiceRequest::TYPE_PRODUCT_SUPPLY);
+        $assignedSales = $this->member($context['provider'], 'sales');
+        $unassignedSales = $this->member($context['provider'], 'sales');
+        $unassignedTechnician = $this->member($context['provider'], 'technician');
+        $administrator = $this->member($context['provider'], 'administrator');
+        app(WorkOrderAssignmentService::class)->assign(
+            $context['work'], $assignedSales, 'delivery', $context['providerOwner'],
+        );
+        $delivery = app(SupplyDeliveryService::class)->create(
+            $context['work'], ['delivery_reference' => 'PRIVATE-DELIVERY'], $assignedSales->user,
+        );
+
+        $this->useProvider($assignedSales->user, $context['provider']);
+        $this->assertSame([$delivery->id], SupplyDeliveryResource::getEloquentQuery()->pluck('id')->all());
+        $this->useProvider($unassignedSales->user, $context['provider']);
+        $this->assertSame([], SupplyDeliveryResource::getEloquentQuery()->pluck('id')->all());
+        $this->useProvider($unassignedTechnician->user, $context['provider']);
+        $this->assertSame([], SupplyDeliveryResource::getEloquentQuery()->pluck('id')->all());
+        $this->useProvider($administrator->user, $context['provider']);
+        $this->assertSame([$delivery->id], SupplyDeliveryResource::getEloquentQuery()->pluck('id')->all());
+        $this->useProvider($context['providerOwner'], $context['provider']);
+        $this->assertSame([$delivery->id], SupplyDeliveryResource::getEloquentQuery()->pluck('id')->all());
+
+        $foreign = $this->provider('Foreign visibility provider');
+        $this->useProvider($foreign['owner'], $foreign['company']);
+        $this->assertSame([], SupplyDeliveryResource::getEloquentQuery()->pluck('id')->all());
     }
 
     public function test_assigned_staff_least_privilege_and_provider_suspension(): void
@@ -161,6 +198,61 @@ class ProviderOperationsTest extends TestCase
         $this->assertSame($second->id, $completed->accepted_completion_submission_id);
         $this->assertSame(WorkOrderCompletionSubmission::STATUS_REVISION_REQUESTED, $first->fresh()->status);
         $this->assertSame(2, $completed->completionSubmissions()->count());
+    }
+
+    public function test_completion_review_blocks_provider_cancellation_and_remains_reviewable(): void
+    {
+        $context = $this->operation();
+        app(WorkOrderService::class)->start($context['work'], $context['providerOwner']);
+        $submission = app(WorkOrderCompletionService::class)->submit(
+            $context['work']->fresh(), 'Awaiting customer review', null,
+            [['evidence_type' => 'other', 'text_value' => 'complete']], $context['providerOwner'],
+        );
+
+        $this->assertValidationError(fn () => app(WorkOrderService::class)->transition(
+            $context['work']->fresh(), WorkOrder::STATUS_CANCELLED, [], $context['providerOwner'],
+        ), 'status');
+        $this->assertSame(WorkOrder::STATUS_COMPLETION_SUBMITTED, $context['work']->fresh()->status);
+        $completed = app(WorkOrderCompletionService::class)->accept(
+            $context['work']->fresh(), $submission, $context['accountOwner'],
+        );
+        $this->assertSame(WorkOrder::STATUS_COMPLETED, $completed->status);
+    }
+
+    public function test_terminal_work_orders_reject_assignments_and_delivery_mutation(): void
+    {
+        foreach ([
+            WorkOrder::STATUS_COMPLETION_SUBMITTED,
+            WorkOrder::STATUS_COMPLETED,
+            WorkOrder::STATUS_CANCELLED,
+        ] as $status) {
+            $context = $this->operation(ServiceRequest::TYPE_PRODUCT_SUPPLY);
+            $sales = $this->member($context['provider'], 'sales');
+            $context['work']->forceFill(['status' => $status])->save();
+            $this->assertValidationError(fn () => app(WorkOrderAssignmentService::class)->assign(
+                $context['work']->fresh(), $sales, 'delivery', $context['providerOwner'],
+            ), 'work_order');
+            $this->assertValidationError(fn () => app(SupplyDeliveryService::class)->create(
+                $context['work']->fresh(), [], $context['providerOwner'],
+            ), 'work_order');
+        }
+
+        $context = $this->operation(ServiceRequest::TYPE_PRODUCT_SUPPLY);
+        $delivery = app(SupplyDeliveryService::class)->create($context['work'], [], $context['providerOwner']);
+        $context['work']->forceFill(['status' => WorkOrder::STATUS_COMPLETED])->save();
+        $this->assertValidationError(fn () => app(SupplyDeliveryService::class)->transition(
+            $delivery, SupplyDelivery::STATUS_READY, [], $context['providerOwner'],
+        ), 'work_order');
+    }
+
+    public function test_assignment_type_must_match_request_semantics(): void
+    {
+        $context = $this->operation();
+        $technician = $this->member($context['provider'], 'technician');
+
+        $this->assertValidationError(fn () => app(WorkOrderAssignmentService::class)->assign(
+            $context['work'], $technician, 'delivery', $context['providerOwner'],
+        ), 'assignment_type');
     }
 
     public function test_cross_workspace_records_and_guessed_submission_are_rejected(): void
@@ -255,6 +347,54 @@ class ProviderOperationsTest extends TestCase
         $activity = WorkOrderActivity::where('work_order_id', $context['work']->id)->firstOrFail();
         $this->expectException(LogicException::class);
         $activity->delete();
+    }
+
+    public function test_unfinished_supply_delivery_blocks_completion_until_terminal(): void
+    {
+        $context = $this->operation(ServiceRequest::TYPE_PRODUCT_SUPPLY);
+        $delivery = app(SupplyDeliveryService::class)->create($context['work'], [], $context['providerOwner']);
+        app(WorkOrderService::class)->start($context['work'], $context['providerOwner']);
+        $this->assertValidationError(fn () => app(WorkOrderCompletionService::class)->submit(
+            $context['work']->fresh(), 'Too early', null,
+            [['evidence_type' => 'other', 'text_value' => 'not delivered']], $context['providerOwner'],
+        ), 'delivery');
+
+        $delivery = app(SupplyDeliveryService::class)->transition($delivery, SupplyDelivery::STATUS_READY, [], $context['providerOwner']);
+        $delivery = app(SupplyDeliveryService::class)->transition($delivery, SupplyDelivery::STATUS_DISPATCHED, [], $context['providerOwner']);
+        app(SupplyDeliveryService::class)->transition(
+            $delivery, SupplyDelivery::STATUS_DELIVERED, ['recipient_name' => 'Customer'], $context['providerOwner'],
+        );
+        $submission = app(WorkOrderCompletionService::class)->submit(
+            $context['work']->fresh(), 'Delivered', null,
+            [['evidence_type' => 'delivery_receipt', 'text_value' => 'signed']], $context['providerOwner'],
+        );
+        $this->assertSame(WorkOrderCompletionSubmission::STATUS_SUBMITTED, $submission->status);
+    }
+
+    public function test_completion_review_notifies_managers_and_assigned_staff_only(): void
+    {
+        $context = $this->operation();
+        $assigned = $this->member($context['provider'], 'technician');
+        $unassigned = $this->member($context['provider'], 'technician');
+        app(WorkOrderAssignmentService::class)->assign(
+            $context['work'], $assigned, 'technician', $context['providerOwner'],
+        );
+        app(WorkOrderService::class)->start($context['work'], $assigned->user);
+        $submission = app(WorkOrderCompletionService::class)->submit(
+            $context['work']->fresh(), 'Ready for review', null,
+            [['evidence_type' => 'other', 'text_value' => 'done']], $assigned->user,
+        );
+        $ownerBefore = $context['providerOwner']->notifications()->count();
+        $assignedBefore = $assigned->user->notifications()->count();
+        $unassignedBefore = $unassigned->user->notifications()->count();
+
+        app(WorkOrderCompletionService::class)->requestRevision(
+            $context['work']->fresh(), $submission, $context['accountOwner'], 'Correct the finishing.',
+        );
+
+        $this->assertSame($ownerBefore + 1, $context['providerOwner']->notifications()->count());
+        $this->assertSame($assignedBefore + 1, $assigned->user->notifications()->count());
+        $this->assertSame($unassignedBefore, $unassigned->user->notifications()->count());
     }
 
     public function test_maintenance_closes_only_after_account_acceptance(): void
@@ -367,6 +507,9 @@ class ProviderOperationsTest extends TestCase
 
     private function provider(string $name): array
     {
+        auth()->logout();
+        app(CurrentAccount::class)->forget();
+        app(CurrentProviderCompany::class)->forget();
         $company = ProviderCompany::create([
             'name' => $name, 'slug' => str()->slug($name).'-'.str()->lower(str()->random(8)),
             'status' => ProviderCompany::STATUS_ACTIVE, 'email' => str()->random(8).'@provider.test',
@@ -393,6 +536,14 @@ class ProviderOperationsTest extends TestCase
         $account->users()->attach($user, ['role' => $role, 'is_active' => true]);
 
         return $user;
+    }
+
+    private function useProvider(User $user, ProviderCompany $company): void
+    {
+        $this->actingAs($user);
+        app(CurrentAccount::class)->forget();
+        app(CurrentProviderCompany::class)->forget();
+        app(CurrentProviderCompany::class)->switch($user, $company->id);
     }
 
     private function expectAuthorization(callable $callback): void

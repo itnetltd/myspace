@@ -135,9 +135,18 @@ class WorkOrderService
         $this->access->authorizeProviderManager($user, $workOrder);
 
         return DB::transaction(function () use ($workOrder, $user) {
+            ProviderCompany::lockForUpdate()->findOrFail($workOrder->provider_company_id);
             $workOrder = WorkOrder::withoutGlobalScopes()->lockForUpdate()->findOrFail($workOrder->getKey());
-            if (in_array($workOrder->status, [WorkOrder::STATUS_COMPLETED, WorkOrder::STATUS_CANCELLED], true)) {
-                throw ValidationException::withMessages(['status' => 'This work order can no longer be cancelled.']);
+            $this->access->authorizeProviderManager($user, $workOrder);
+            if (! in_array($workOrder->status, [
+                WorkOrder::STATUS_PENDING,
+                WorkOrder::STATUS_SCHEDULED,
+                WorkOrder::STATUS_IN_PROGRESS,
+                WorkOrder::STATUS_REVISION_REQUESTED,
+            ], true)) {
+                throw ValidationException::withMessages([
+                    'status' => 'This work order cannot be cancelled in its current state.',
+                ]);
             }
             $workOrder->forceFill(['status' => WorkOrder::STATUS_CANCELLED])->save();
             ServiceRequest::withoutGlobalScopes()->whereKey($workOrder->service_request_id)

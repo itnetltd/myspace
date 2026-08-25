@@ -28,6 +28,7 @@ class SupplyDeliveryService
             $workOrder = WorkOrder::withoutGlobalScopes()->lockForUpdate()->findOrFail($workOrder->getKey());
             $this->access->authorizeProviderOperation($user, $workOrder);
             $request = ServiceRequest::withoutGlobalScopes()->findOrFail($workOrder->service_request_id);
+            $this->ensureOperationalWorkOrder($workOrder, 'New deliveries');
             if ($request->request_type !== ServiceRequest::TYPE_PRODUCT_SUPPLY) {
                 throw ValidationException::withMessages(['work_order' => 'Deliveries are only available for product-supply work orders.']);
             }
@@ -61,6 +62,7 @@ class SupplyDeliveryService
             $delivery = SupplyDelivery::withoutGlobalScopes()->lockForUpdate()->findOrFail($delivery->getKey());
             $workOrder = WorkOrder::withoutGlobalScopes()->lockForUpdate()->findOrFail($delivery->work_order_id);
             $this->access->authorizeProviderOperation($user, $workOrder);
+            $this->ensureOperationalWorkOrder($workOrder, 'Delivery transitions');
             $allowed = match ($delivery->status) {
                 SupplyDelivery::STATUS_PREPARING => [SupplyDelivery::STATUS_READY, SupplyDelivery::STATUS_CANCELLED],
                 SupplyDelivery::STATUS_READY => [SupplyDelivery::STATUS_DISPATCHED, SupplyDelivery::STATUS_CANCELLED],
@@ -106,6 +108,9 @@ class SupplyDeliveryService
 
         DB::transaction(function () use ($delivery, $workOrder, $evidence, $user) {
             $delivery = SupplyDelivery::withoutGlobalScopes()->lockForUpdate()->findOrFail($delivery->getKey());
+            $workOrder = WorkOrder::withoutGlobalScopes()->lockForUpdate()->findOrFail($workOrder->getKey());
+            $this->access->authorizeProviderOperation($user, $workOrder);
+            $this->ensureOperationalWorkOrder($workOrder, 'Delivery evidence');
             if (! in_array($delivery->status, [SupplyDelivery::STATUS_DISPATCHED, SupplyDelivery::STATUS_DELIVERED], true)) {
                 throw ValidationException::withMessages(['delivery' => 'Delivery evidence can only be recorded after dispatch.']);
             }
@@ -116,5 +121,18 @@ class SupplyDeliveryService
         });
 
         return $delivery->refresh();
+    }
+
+    private function ensureOperationalWorkOrder(WorkOrder $workOrder, string $operation): void
+    {
+        if (in_array($workOrder->status, [
+            WorkOrder::STATUS_COMPLETION_SUBMITTED,
+            WorkOrder::STATUS_COMPLETED,
+            WorkOrder::STATUS_CANCELLED,
+        ], true)) {
+            throw ValidationException::withMessages([
+                'work_order' => $operation.' are unavailable after completion review begins or work is terminal.',
+            ]);
+        }
     }
 }
